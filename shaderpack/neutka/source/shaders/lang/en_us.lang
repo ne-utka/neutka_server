@@ -1,4 +1,10 @@
 screen=neutka settings
+option.TAA_ENABLED=Temporal anti-aliasing
+option.TAA_ENABLED.comment=Accumulates reprojected frames to smooth terrain, entities, outlines, DH, and the sky.
+option.TAA_BLEND=History blend
+option.TAA_BLEND.comment=Higher values are smoother; lower values reduce ghosting during movement.
+option.TAA_JITTER_STRENGTH=Jitter strength
+option.TAA_JITTER_STRENGTH.comment=Sub-pixel sampling distance used by the eight-frame TAA sequence.
 option.OUTLINE_MODE=Outline mode
 option.OUTLINE_MODE.comment=Off, Standard, or thicker Dungeons-style depth outlines.
 value.OUTLINE_MODE.0=Off
