@@ -1,4 +1,8 @@
-screen=Настройки neutka
+screen=Shader — настройки
+screen.OUTLINE=Обводка и грани
+screen.ANTIALIASING=Сглаживание
+screen.DISTANT_LOD=Дальние LOD и вода
+screen.EMISSIVE=Свечение
 option.TAA_ENABLED=TAA-сглаживание
 option.TAA_ENABLED.comment=Накапливает перепроецированные кадры и сглаживает блоки, энтити, контуры, DH и небо.
 option.TAA_BLEND=Смешивание истории

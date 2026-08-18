@@ -1,4 +1,8 @@
-screen=neutka settings
+screen=Shader Settings
+screen.OUTLINE=Outlines & Edges
+screen.ANTIALIASING=Anti-Aliasing
+screen.DISTANT_LOD=Distant LOD & Water
+screen.EMISSIVE=Emissive Lighting
 option.TAA_ENABLED=Temporal anti-aliasing
 option.TAA_ENABLED.comment=Accumulates reprojected frames to smooth terrain, entities, outlines, DH, and the sky.
 option.TAA_BLEND=History blend

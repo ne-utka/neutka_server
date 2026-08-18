@@ -2,9 +2,10 @@
 #define NEUTKA_SETTINGS_GLSL
 
 // Temporal anti-aliasing with an 8-sample jitter sequence and reprojected history.
-#define TAA_ENABLED
-#define TAA_BLEND 0.90 // [0.70 0.75 0.80 0.85 0.88 0.90 0.92 0.95]
-#define TAA_JITTER_STRENGTH 1.00 // [0.00 0.25 0.50 0.75 1.00]
+// Defaults mirror the currently selected Iris options.
+//#define TAA_ENABLED
+#define TAA_BLEND 0.95 // [0.70 0.75 0.80 0.85 0.88 0.90 0.92 0.95]
+#define TAA_JITTER_STRENGTH 0.00 // [0.00 0.25 0.50 0.75 1.00]
 
 // 0 = disabled, 1 = standard, 2 = dungeons-style
 #define OUTLINE_MODE 2 // [0 1 2]
@@ -26,7 +27,7 @@
 #define VOXY_FACE_FLATTEN_START 0.50 // [0.00 0.25 0.50 0.60 0.70 0.80 0.90 0.95]
 
 // Fade native water texture detail into the smoother DH representation by distance.
-#define WATER_LOD_SMOOTHING_ENABLED
+//#define WATER_LOD_SMOOTHING_ENABLED
 #define WATER_BLUR_START 50.0 // [16.0 24.0 32.0 40.0 50.0 64.0 80.0 96.0 128.0 160.0]
 #define WATER_BLUR_END 160.0 // [64.0 80.0 96.0 128.0 160.0 192.0 256.0 320.0 512.0]
 #define WATER_BLUR_STRENGTH 1.00 // [0.00 0.25 0.50 0.75 1.00]
