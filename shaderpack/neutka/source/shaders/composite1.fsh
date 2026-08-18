@@ -56,7 +56,6 @@ vec2 taaJitterOffset(int frameIndex) {
 vec2 reprojectToPrevious(vec2 uv, float nativeDepth, float dhDepth, bool voxyGeometry) {
     vec2 resolution = max(vec2(viewWidth, viewHeight), vec2(1.0));
     vec2 currentJitter = voxyGeometry ? vec2(0.0) : taaJitterOffset(frameCounter);
-    vec2 previousJitter = voxyGeometry ? vec2(0.0) : taaJitterOffset(frameCounter - 1);
     vec2 currentNdc = uv * 2.0 - 1.0 - currentJitter * (2.0 / resolution);
 
     bool nativeGeometry = validDepth(nativeDepth);
@@ -84,7 +83,6 @@ vec2 reprojectToPrevious(vec2 uv, float nativeDepth, float dhDepth, bool voxyGeo
 
     if (!finiteVector(previousClip) || abs(previousClip.w) < 1.0e-7) return vec2(-1.0);
     vec2 previousUv = previousClip.xy / previousClip.w * 0.5 + 0.5;
-    previousUv += previousJitter / resolution;
     return finiteVector(previousUv) ? previousUv : vec2(-1.0);
 }
 
@@ -103,18 +101,28 @@ void neighborhoodBounds(ivec2 pixel, out vec3 minimumColor, out vec3 maximumColo
 }
 
 void main() {
-    vec4 currentColor = texture(colortex0, texCoord);
-
 #ifndef TAA_ENABLED
+    vec4 currentColor = texture(colortex0, texCoord);
     sceneOut = currentColor;
     historyOut = vec4(currentColor.rgb, 1.0);
     return;
 #else
-    float nativeDepth = texture(depthtex0, texCoord).r;
-    float dhDepth = texture(dhDepthTex, texCoord).r;
-    bool voxyGeometry = texture(colortex1, texCoord).a > 0.999;
+    vec2 resolution = max(vec2(viewWidth, viewHeight), vec2(1.0));
+    vec2 halfTexel = 0.5 / resolution;
 
-    vec2 previousUv = reprojectToPrevious(texCoord, nativeDepth, dhDepth, voxyGeometry);
+    // Rasterized geometry contains the current sub-pixel offset. Sample it at
+    // that offset so the resolved image and its history stay on a stable grid.
+    bool voxyAtCenter = texture(colortex1, texCoord).a > 0.999;
+    vec2 currentJitter = voxyAtCenter ? vec2(0.0) : taaJitterOffset(frameCounter);
+    vec2 currentUv = clamp(texCoord + currentJitter / resolution,
+                           halfTexel, vec2(1.0) - halfTexel);
+
+    vec4 currentColor = texture(colortex0, currentUv);
+    float nativeDepth = texture(depthtex0, currentUv).r;
+    float dhDepth = texture(dhDepthTex, currentUv).r;
+    bool voxyGeometry = texture(colortex1, currentUv).a > 0.999;
+
+    vec2 previousUv = reprojectToPrevious(currentUv, nativeDepth, dhDepth, voxyGeometry);
     bool validHistoryUv = all(greaterThan(previousUv, vec2(0.001)))
                        && all(lessThan(previousUv, vec2(0.999)));
     bool cameraStable = length(cameraPosition - previousCameraPosition) < 32.0;
@@ -125,7 +133,7 @@ void main() {
         if (historyColor.a > 0.5 && finiteVector(historyColor)) {
             vec3 minimumColor;
             vec3 maximumColor;
-            neighborhoodBounds(ivec2(gl_FragCoord.xy), minimumColor, maximumColor);
+            neighborhoodBounds(ivec2(currentUv * resolution), minimumColor, maximumColor);
             vec3 clippedHistory = clamp(historyColor.rgb, minimumColor, maximumColor);
 
             vec2 velocityPixels = (previousUv - texCoord) * vec2(viewWidth, viewHeight);
