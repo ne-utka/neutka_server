@@ -1,7 +1,8 @@
 {
   "pack": {
     "description": "Resourcepack | Minecraft Java 26.1.2",
-    "min_format": [84, 0],
+    "pack_format": 84,
+    "min_format": 84,
     "max_format": 84
   }
 }
