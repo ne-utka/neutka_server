@@ -13,6 +13,7 @@ in vec2 texCoord;
 in vec2 lightCoord;
 in vec4 vertexColor;
 in float emissiveLayer;
+in float viewDistance;
 flat in int materialId;
 
 layout(location = 0) out vec4 sceneOut;
@@ -33,6 +34,12 @@ void main() {
     vec4 albedo = texture(gtexture, texCoord) * vertexColor;
     if (albedo.a < 0.01) discard;
 
+    bool dynamicWater = false;
+#ifdef DYNAMIC_BLOCK_TRANSLUCENCY
+    int localId = materialId >= 10000 ? materialId - 10000 : materialId;
+    dynamicWater = localId == 1;
+#endif
+
 #ifdef APPLY_ENTITY_COLOR
     albedo.rgb = mix(albedo.rgb, entityColor.rgb, entityColor.a);
 #endif
@@ -47,6 +54,13 @@ void main() {
     emissiveColor *= ENTITY_EMISSIVE_BRIGHTNESS;
 #endif
     vec3 litColor = mix(albedo.rgb * lighting, emissiveColor, emissive);
+#ifdef WATER_LOD_SMOOTHING_ENABLED
+    if (dynamicWater) {
+        float waterSmoothing = smoothstep(WATER_BLUR_START, max(WATER_BLUR_END, WATER_BLUR_START + 1.0), viewDistance);
+        vec3 lodWater = vertexColor.rgb * lighting;
+        litColor = mix(litColor, lodWater, waterSmoothing * WATER_BLUR_STRENGTH);
+    }
+#endif
     sceneOut = vec4(litColor, albedo.a);
 
     // Translucent surfaces replace the outline mask so geometry behind them
@@ -54,10 +68,8 @@ void main() {
     float outlineMask = TRANSLUCENT_OUTLINE_MASK;
     vec4 suppression = SUPPRESSION_MASK;
 #ifdef DYNAMIC_BLOCK_TRANSLUCENCY
-    int localId = materialId >= 10000 ? materialId - 10000 : materialId;
-    bool water = localId == 1;
-    outlineMask = water ? 0.0 : 0.95;
-    suppression = vec4(0.0, water ? 1.0 : 0.0, 0.0, 0.0);
+    outlineMask = dynamicWater ? 0.0 : 0.95;
+    suppression = vec4(0.0, dynamicWater ? 1.0 : 0.0, 0.0, 0.0);
 #endif
 #ifdef DYNAMIC_ENTITY_TRANSLUCENCY
     outlineMask = albedo.a >= 0.9 ? 1.0 : 0.0;
