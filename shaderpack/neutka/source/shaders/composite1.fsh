@@ -119,7 +119,10 @@ void main() {
 
     vec4 currentColor = texture(colortex0, currentUv);
     float nativeDepth = texture(depthtex0, currentUv).r;
-    float dhDepth = texture(dhDepthTex, currentUv).r;
+    float dhDepth = 1.0;
+    if (!validDepth(nativeDepth)) {
+        dhDepth = texture(dhDepthTex, currentUv).r;
+    }
     bool voxyGeometry = texture(colortex1, currentUv).a > 0.999;
 
     vec2 previousUv = reprojectToPrevious(currentUv, nativeDepth, dhDepth, voxyGeometry);

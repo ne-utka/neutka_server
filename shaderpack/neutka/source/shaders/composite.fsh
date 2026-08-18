@@ -49,9 +49,16 @@ struct SceneDepth {
 
 SceneDepth readSceneDepth(ivec2 pixel) {
     float nativeDepth = texelFetch(depthtex0, pixel, 0).r;
-    float dhDepth = texelFetch(dhDepthTex, pixel, 0).r;
     bool nativeValid = validNativeDepth(nativeDepth);
-    bool dhValid = validDhDepth(dhDepth);
+    float dhDepth = 1.0;
+    bool dhValid = false;
+
+    // DH depth can only win when no native chunk geometry exists here.
+    // Skipping this fetch for native pixels preserves the exact depth choice.
+    if (!nativeValid) {
+        dhDepth = texelFetch(dhDepthTex, pixel, 0).r;
+        dhValid = validDhDepth(dhDepth);
+    }
 
     SceneDepth result;
     result.nativeGeometry = nativeValid;
