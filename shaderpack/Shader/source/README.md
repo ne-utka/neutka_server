@@ -1,11 +1,11 @@
-# neutka
+# Shader
 
 Shader pack для Fabric + Iris + Sodium с CazToon-style depth-based обводкой блоков и энтити и полноэкранным TAA.
 
 ## Установка
 
-1. Скопировать папку `neutka` или архив `neutka.zip` в `.minecraft/shaderpacks/`.
-2. Открыть настройки графики Iris и выбрать `neutka`.
+1. Скопировать архив `Shader.zip` в `.minecraft/shaderpacks/`.
+2. Открыть настройки графики Iris и выбрать `Shader.zip`.
 3. Параметры TAA и контура находятся в Shader Pack Settings.
 
 ## Реализация
@@ -13,11 +13,10 @@ Shader pack для Fabric + Iris + Sodium с CazToon-style depth-based обво�
 - Непрозрачные terrain, block entity и entity passes записывают маску в `colortex1.r`.
 - `colortex1` хранит outline mask, emissive mask, skylight и класс геометрии.
 - `colortex2` хранит маски облаков, воды/стекла и погодного тумана.
-- `colortex3` хранит emissive-цвет для совместимости с последующим bloom-проходом.
 - `composite.fsh` объединяет `depthtex0` с `dhDepthTex` и ищет перепады по четырём диагональным точкам.
 - `composite1.fsh` выполняет TAA: перепроекцию истории, ограничение по окрестности и подавление шлейфов при движении.
 - Восьмикадровый субпиксельный jitter применяется к обычной геометрии и Distant Horizons; Voxy обрабатывается отдельной стабильной веткой.
-- История TAA хранится в persistent `colortex4`, не пересекаясь с emissive-данными в `colortex3`.
+- История TAA хранится в persistent `colortex4`.
 - Standard использует положительный лапласиан глубины.
 - Dungeons Style использует относительную линеаризованную глубину и проверку диагонального контраста.
 - На стыке native chunks и Distant Horizons контур подавляется.
