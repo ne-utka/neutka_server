@@ -88,13 +88,12 @@ float dungeonsOutline(SceneDepth center, SceneDepth a, SceneDepth b, SceneDepth 
          * smoothstep(0.05, 0.12, diagonalContrast / divisor);
 }
 
-float outlineAt(ivec2 pixel) {
+float outlineAt(ivec2 pixel, SceneDepth center) {
     ivec2 size = textureSize(depthtex0, 0);
     ivec2 lo = ivec2(0);
     ivec2 hi = size - ivec2(1);
     int radius = OUTLINE_PIXEL_SIZE;
 
-    SceneDepth center = readSceneDepth(clamp(pixel, lo, hi));
     if (!center.nativeGeometry && !center.dhGeometry) return 0.0;
 
     SceneDepth a = readSceneDepth(clamp(pixel + ivec2(-radius, -radius), lo, hi));
@@ -180,29 +179,29 @@ void main() {
 
 #if OUTLINE_MODE != 0
     vec4 metadata = texelFetch(colortex1, pixel, 0);
-    vec4 suppression = texelFetch(colortex2, pixel, 0);
-    SceneDepth center = readSceneDepth(pixel);
-
     float outlineMask = metadata.r;
     bool voxyGeometry = metadata.a > 0.999;
 #ifndef VOXY_LOD_OUTLINES
     if (voxyGeometry) outlineMask = 0.0;
 #endif
 
-    float visibility = fogSuppression(center.linear, metadata.b, suppression);
-    float cloudVisibility = 1.0 - smoothstep(0.02, 0.20, suppression.r);
-    float translucentVisibility = 1.0 - step(0.01, suppression.g);
-    float vegetationVisibility = greenLodFilter(scene.rgb, center.dhGeometry);
+    // Most screen pixels have no outline mask. Avoid all depth-neighbour work
+    // for them; this is mathematically identical to multiplying the edge by 0.
+    if (outlineMask > 0.0) {
+        vec4 suppression = texelFetch(colortex2, pixel, 0);
+        SceneDepth center = readSceneDepth(pixel);
+        float visibility = fogSuppression(center.linear, metadata.b, suppression);
+        float cloudVisibility = 1.0 - smoothstep(0.02, 0.20, suppression.r);
+        float translucentVisibility = 1.0 - step(0.01, suppression.g);
+        float visibleMask = outlineMask * visibility * cloudVisibility * translucentVisibility;
 
-    float edge = outlineAt(pixel)
-               * outlineMask
-               * visibility
-               * cloudVisibility
-               * translucentVisibility
-               * vegetationVisibility;
-
-    scene.rgb *= 1.0 + edge * OUTLINE_BRIGHTNESS;
-    scene.rgb = mix(scene.rgb, saturateAlongEdge(scene.rgb, OUTLINE_SATURATION), clamp(edge, 0.0, 1.0));
+        if (visibleMask > 0.0) {
+            float vegetationVisibility = greenLodFilter(scene.rgb, center.dhGeometry);
+            float edge = outlineAt(pixel, center) * visibleMask * vegetationVisibility;
+            scene.rgb *= 1.0 + edge * OUTLINE_BRIGHTNESS;
+            scene.rgb = mix(scene.rgb, saturateAlongEdge(scene.rgb, OUTLINE_SATURATION), clamp(edge, 0.0, 1.0));
+        }
+    }
 #endif
 
     gl_FragColor = scene;

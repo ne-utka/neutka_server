@@ -14,8 +14,8 @@
   "samplers": {
     "depthtex0": "sampler2D"
   },
-  "opaqueDrawBuffers": [0, 1, 3],
-  "translucentDrawBuffers": [0, 1, 2, 3],
+  "opaqueDrawBuffers": [0, 1],
+  "translucentDrawBuffers": [0, 1, 2],
   "blending": {
     "-1": "off",
     "0": "SRC_ALPHA ONE_MINUS_SRC_ALPHA ONE_MINUS_DST_ALPHA ONE"

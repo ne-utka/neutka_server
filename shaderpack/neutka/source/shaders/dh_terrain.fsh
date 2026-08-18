@@ -1,5 +1,5 @@
 #version 330 compatibility
-/* RENDERTARGETS: 0,1,3 */
+/* RENDERTARGETS: 0,1 */
 
 #include "/settings.glsl"
 
@@ -11,7 +11,6 @@ flat in int materialId;
 
 layout(location = 0) out vec4 sceneOut;
 layout(location = 1) out vec4 metadataOut;
-layout(location = 2) out vec4 emissiveOut;
 
 void main() {
     bool emissive = materialId == DH_BLOCK_ILLUMINATED || materialId == DH_BLOCK_LAVA;
@@ -21,5 +20,4 @@ void main() {
 
     sceneOut = vec4(emissive ? glow : lit, vertexColor.a);
     metadataOut = vec4(1.0, emissive ? 1.0 : 0.0, lightCoord.y, 0.0);
-    emissiveOut = vec4(emissive ? glow : vec3(0.0), 1.0);
 }

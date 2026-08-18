@@ -1,4 +1,4 @@
-/* RENDERTARGETS: 0,1,2,3 */
+/* RENDERTARGETS: 0,1,2 */
 
 #include "/settings.glsl"
 
@@ -18,7 +18,6 @@ flat in int materialId;
 layout(location = 0) out vec4 sceneOut;
 layout(location = 1) out vec4 maskOut;
 layout(location = 2) out vec4 suppressionOut;
-layout(location = 3) out vec4 emissiveOut;
 
 #ifndef TRANSLUCENT_OUTLINE_MASK
 #define TRANSLUCENT_OUTLINE_MASK 0.0
@@ -65,5 +64,4 @@ void main() {
 #endif
     maskOut = vec4(outlineMask, emissive, clamp(lightCoord.y, 0.0, 1.0), MATERIAL_CLASS);
     suppressionOut = suppression;
-    emissiveOut = vec4(emissiveColor * emissive, 1.0);
 }

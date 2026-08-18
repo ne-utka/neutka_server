@@ -3,7 +3,6 @@
 layout(location = 0) out vec4 voxySceneOut;
 layout(location = 1) out vec4 voxyMetadataOut;
 layout(location = 2) out vec4 voxySuppressionOut;
-layout(location = 3) out vec4 voxyEmissiveOut;
 
 uint neutkaVoxyBlockId(uint customId) {
     return customId >= 10000u ? customId - 10000u : customId;
@@ -21,5 +20,4 @@ void voxy_emitFragment(VoxyFragmentParameters parameters) {
     voxySceneOut = vec4(emissive ? glow : lit, albedo.a);
     voxyMetadataOut = vec4(water ? 0.0 : 1.0, emissive ? 1.0 : 0.0, skylight, 1.0);
     voxySuppressionOut = vec4(0.0, water ? 1.0 : 0.0, 0.0, 0.0);
-    voxyEmissiveOut = vec4(emissive ? glow : vec3(0.0), 1.0);
 }
