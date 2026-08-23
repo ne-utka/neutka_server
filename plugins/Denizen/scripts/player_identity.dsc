@@ -28,6 +28,11 @@ marallyzen_identity_events:
     - if <context.hand> != mainhand:
       - stop
     - define target <context.entity>
+    # An entity can disappear between the Bukkit interaction event and this
+    # queue (notably the temporary blaze used by the test dummy). EntityTag
+    # is_npc requires a live entity, so reject stale references first.
+    - if !<[target].is_spawned||false>:
+      - stop
     - if <[target].is_npc>:
       - if !<[target].has_flag[marallyzen_slap_dummy]>:
         - stop

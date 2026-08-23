@@ -77,6 +77,12 @@ marallyzen_dictaphone_command:
       - stop
     - define target <player.eye_location.ray_trace_target[range=6;entities=item_display|interaction].hit_entity||null>
     - define id <[target].flag[dictaphone_id]||null>
+    # A floor display is commonly occluded by its supporting block during ray
+    # tracing. The support carries the same persistent ID, so use it as the
+    # precise fallback for commands aimed at a stationary dictaphone.
+    - if <[id]> == null:
+      - define support <player.cursor_on[6]>
+      - define id <[support].flag[marallyzen_dictaphone_id]||null>
     - if <[id]> == null:
       - narrate "<yellow>Посмотрите на диктофон в пределах 6 блоков."
       - stop
@@ -127,6 +133,9 @@ marallyzen_dictaphone_command:
         - stop
       - define target <player.eye_location.ray_trace_target[range=6;entities=item_display|interaction].hit_entity||null>
       - define id <[target].flag[dictaphone_id]||null>
+      - if <[id]> == null:
+        - define support <player.cursor_on[6]>
+        - define id <[support].flag[marallyzen_dictaphone_id]||null>
       - if <[id]> == null:
         - narrate "<yellow>Посмотрите на диктофон в пределах 6 блоков."
         - stop
