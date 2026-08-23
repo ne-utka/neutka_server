@@ -1,0 +1,484 @@
+# Marallyzen server-side dictaphones for Paper 26.1.2 + Denizen 1.3.2-b7286M-DEV.
+# No Citizens, Depenizen or client mod is required.
+# Persistent records are stored under server flag "marallyzen_dictaphones".
+#
+# Audio-ready record fields (currently intentionally silent):
+# sound_mode = none | local | global
+# sound_id = namespaced Minecraft/resource-pack sound id
+# sound_radius = intended positional radius for local playback
+
+marallyzen_dictaphone_config:
+  type: data
+  debug: false
+  use_permission: marallyzen.dictaphone.use
+  admin_permission: marallyzen.dictaphone.admin
+  view_distance: 1.5
+  # Five three-tick client-interpolated beats: 0.75 seconds total. This keeps
+  # the motion responsive while still leaving enough frames for a cinematic
+  # launch, controlled overshoot and settle.
+  animation_step: 3t
+  # X and Y wind angles in degrees, followed by client interpolation time.
+  sway_frames:
+  - "0.000,3.600,12t"
+  - "1.650,3.050,11t"
+  - "2.450,1.150,13t"
+  - "2.100,-0.750,12t"
+  - "1.050,-2.400,11t"
+  - "0.000,-3.600,12t"
+  - "-1.750,-2.950,13t"
+  - "-2.550,-1.000,11t"
+  - "-2.050,0.850,12t"
+  - "-1.000,2.550,13t"
+
+marallyzen_dictaphone_command:
+  type: command
+  debug: false
+  name: dictaphone
+  aliases:
+  - dict
+  description: Управление серверными диктофонами Marallyzen
+  usage: /dictaphone spawn | remove | info | rebuild | cancel
+  permission: marallyzen.dictaphone.use
+  permission message: <red>Недостаточно прав.
+  tab complete:
+  - define admin <context.server>
+  - if !<[admin]>:
+    - define admin <player.is_op.or[<player.has_permission[marallyzen.dictaphone.admin]>]>
+  - if <context.args.size> <= 1:
+    - if <[admin]>:
+      - determine spawn|remove|info|rebuild|cancel
+    - determine info|cancel
+  - determine <list[]>
+  script:
+  - define sub <context.args.get[1].to_lowercase||help>
+  - if <[sub]> == cancel:
+    - if <player.exists||false>:
+      - run marallyzen_dictaphone_close def:<player>|true
+    - stop
+  - if <[sub]> == info:
+    - if !<player.exists||false>:
+      - narrate "Команда доступна только игроку."
+      - stop
+    - define target <player.eye_location.ray_trace_target[range=6;entities=item_display|interaction].hit_entity||null>
+    - define id <[target].flag[dictaphone_id]||null>
+    - if <[id]> == null:
+      - narrate "<yellow>Посмотрите на диктофон в пределах 6 блоков."
+      - stop
+    - define record <server.flag[marallyzen_dictaphones.<[id]>]||null>
+    - if <[record]> == null:
+      - narrate "<red>Запись диктофона не найдена."
+      - stop
+    - narrate "<gold>ID<&co> <white><[id]>"
+    - narrate "<gold>Звук<&co> <white><[record].get[sound_mode]||none> / <[record].get[sound_id]||не назначен>"
+    - narrate "<gold>Создатель<&co> <white><[record].get[creator]||неизвестен>"
+    - stop
+  - define admin true
+  - if <player.exists||false>:
+    - define admin <player.is_op.or[<player.has_permission[marallyzen.dictaphone.admin]>]>
+  - if !<[admin]>:
+    - narrate "<red>Нужно право marallyzen.dictaphone.admin или OP."
+    - stop
+  - choose <[sub]>:
+    - case spawn:
+      - if !<player.exists||false>:
+        - narrate "Команда доступна только игроку."
+        - stop
+      - define support <player.cursor_on[6]>
+      - if <[support]> == null || !<[support].material.is_solid>:
+        - narrate "<yellow>Посмотрите на верхнюю грань твёрдого блока в пределах 6 блоков."
+        - stop
+      - if <[support].has_flag[marallyzen_dictaphone_id]>:
+        - narrate "<red>На этом блоке уже стоит диктофон."
+        - stop
+      - run marallyzen_dictaphone_create def:<[support]>|<player>
+    - case remove:
+      - if !<player.exists||false>:
+        - narrate "Команда доступна только игроку."
+        - stop
+      - define target <player.eye_location.ray_trace_target[range=6;entities=item_display|interaction].hit_entity||null>
+      - define id <[target].flag[dictaphone_id]||null>
+      - if <[id]> == null:
+        - narrate "<yellow>Посмотрите на диктофон в пределах 6 блоков."
+        - stop
+      - run marallyzen_dictaphone_remove def:<[id]>|<player>
+    - case rebuild:
+      - run marallyzen_dictaphone_rebuild
+      - narrate "<green>Проверка и восстановление диктофонов запущены."
+    - default:
+      - narrate "<gold>/dictaphone spawn <gray>— поставить на блок, на который вы смотрите"
+      - narrate "<gold>/dictaphone remove <gray>— удалить диктофон, на который вы смотрите"
+      - narrate "<gold>/dictaphone info | rebuild | cancel"
+
+marallyzen_dictaphone_events:
+  type: world
+  debug: false
+  events:
+    on player right clicks interaction:
+    - define id <context.entity.flag[dictaphone_id]||null>
+    - if <[id]> == null:
+      - stop
+    - determine passively cancelled
+    - ratelimit <player> 2t
+    - if <context.entity.flag[dictaphone_role]||null> == session_interaction:
+      - if <context.entity.flag[dictaphone_session_owner]||null> != <player.uuid>:
+        - stop
+      # The airborne dictaphone is presentation/playback state, not a toggle.
+      # Ignore repeat clicks during both flight and viewing so an accidental
+      # click can never interrupt the animation or put it back on the floor.
+      - stop
+    - run marallyzen_dictaphone_open def:<[id]>|<player>
+
+    on player tries to attack interaction:
+    - define id <context.entity.flag[dictaphone_id]||null>
+    - if <[id]> == null:
+      - stop
+    - determine passively cancelled
+
+    on player damages item_display:
+    - define id <context.entity.flag[dictaphone_id]||null>
+    - if <[id]> == null:
+      - stop
+    - determine passively cancelled
+
+    on player breaks block:
+    - define id <context.location.flag[marallyzen_dictaphone_id]||null>
+    - if <[id]> == null:
+      - stop
+    - if !<player.is_op> && !<player.has_permission[marallyzen.dictaphone.admin]>:
+      - determine cancelled
+      - stop
+    - run marallyzen_dictaphone_remove def:<[id]>|<player>
+
+    on player quits:
+    - run marallyzen_dictaphone_close def:<player>|false
+    on player dies:
+    - run marallyzen_dictaphone_close def:<player>|false
+    on player changes world:
+    - run marallyzen_dictaphone_close def:<player>|false
+    on reload scripts:
+    - foreach <server.online_players> as:viewer:
+      - run marallyzen_dictaphone_close def:<[viewer]>|false
+    - run marallyzen_dictaphone_rebuild delay:2t
+    on server start:
+    - run marallyzen_dictaphone_rebuild delay:2s
+    on chunk loads:
+    - ratelimit <context.chunk> 2s
+    - run marallyzen_dictaphone_rebuild_chunk def:<context.chunk> delay:2t
+
+marallyzen_dictaphone_create:
+  type: task
+  debug: false
+  definitions: support|admin
+  script:
+  - if !<[support].material.is_solid>:
+    - narrate "<red>Диктофону нужна твёрдая опора." targets:<[admin]>
+    - stop
+  - define id <util.random_uuid>
+  - define yaw <[admin].location.yaw>
+  # Item models are centred around model-space Y=8. The model starts at Y=0,
+  # so its display origin is placed half a block above the supporting surface.
+  - define position <[support].center.add[0,1,0].with_yaw[<[yaw]>].with_pitch[0]>
+  - flag server marallyzen_dictaphones.<[id]>:map@[position=<[position]>;support=<[support]>;yaw=<[yaw]>;creator=<[admin].uuid>;sound_mode=none;sound_id=null;sound_radius=16]
+  - flag <[support]> marallyzen_dictaphone_id:<[id]>
+  - run marallyzen_dictaphone_spawn_stationary def:<[id]>
+  - playsound <[position]> sound:block_wood_place volume:0.55 pitch:1.35
+  - narrate "<green>Диктофон установлен. ID<&co> <[id]>" targets:<[admin]>
+
+marallyzen_dictaphone_spawn_stationary:
+  type: task
+  debug: false
+  definitions: id
+  script:
+  - define record <server.flag[marallyzen_dictaphones.<[id]>]||null>
+  - if <[record]> == null:
+    - stop
+  - define support <[record].get[support]>
+  - if !<[support].chunk.is_loaded>:
+    - stop
+  - if !<[support].material.is_solid>:
+    - run marallyzen_dictaphone_remove def:<[id]>|null
+    - stop
+  - if <server.has_flag[marallyzen_dictaphone_spawning.<[id]>]>:
+    - stop
+  - flag server marallyzen_dictaphone_spawning.<[id]>:true expire:2s
+  - foreach <list[<[record].get[display]||null>|<[record].get[interaction]||null>]> as:old_entity:
+    - if <[old_entity]> != null && <[old_entity].is_spawned||false>:
+      - remove <[old_entity]>
+  - define position <[support].center.add[0,1,0].with_yaw[<[record].get[yaw]||0>].with_pitch[0]>
+  - flag server marallyzen_dictaphones.<[id]>.position:<[position]>
+  - spawn item_display[item=paper[item_model=marallyzen:dictaphone_simple];display=fixed;pivot=fixed;scale=1,1,1;interpolation_duration=0t;teleport_duration=0t;view_range=32;shadow_radius=0] <[position]> persistent save:dictaphone_display
+  - define display <entry[dictaphone_display].spawned_entity>
+  - flag <[display]> dictaphone_id:<[id]>
+  - flag <[display]> dictaphone_role:stationary_model
+  - define hitbox_location <[support].center.add[0,0.5,0]>
+  - spawn interaction[width=0.72;height=0.32;is_aware=true] <[hitbox_location]> persistent save:dictaphone_interaction
+  - define interaction <entry[dictaphone_interaction].spawned_entity>
+  - flag <[interaction]> dictaphone_id:<[id]>
+  - flag <[interaction]> dictaphone_role:stationary_interaction
+  - flag server marallyzen_dictaphones.<[id]>.display:<[display]>
+  - flag server marallyzen_dictaphones.<[id]>.interaction:<[interaction]>
+  - flag <[support]> marallyzen_dictaphone_id:<[id]>
+  - flag server marallyzen_dictaphone_spawning.<[id]>:!
+
+marallyzen_dictaphone_remove:
+  type: task
+  debug: false
+  definitions: id|actor
+  script:
+  - define record <server.flag[marallyzen_dictaphones.<[id]>]||null>
+  - if <[record]> == null:
+    - stop
+  - foreach <server.online_players> as:viewer:
+    - if <[viewer].flag[marallyzen_dictaphone_session.dictaphone_id]||null> == <[id]>:
+      - run marallyzen_dictaphone_close def:<[viewer]>|false
+  - foreach <list[<[record].get[display]||null>|<[record].get[interaction]||null>]> as:entity:
+    - if <[entity]> != null && <[entity].is_spawned||false>:
+      - remove <[entity]>
+  - define support <[record].get[support]>
+  - flag <[support]> marallyzen_dictaphone_id:!
+  - flag server marallyzen_dictaphones.<[id]>:!
+  - if <[actor]> != null:
+    - narrate "<green>Диктофон удалён." targets:<[actor]>
+
+marallyzen_dictaphone_rebuild:
+  type: task
+  debug: false
+  script:
+  - foreach <server.flag[marallyzen_dictaphones].keys||<list[]>> as:id:
+    - define record <server.flag[marallyzen_dictaphones.<[id]>]>
+    # Forward-compatible defaults for records made before audio is implemented.
+    - if <[record].get[sound_mode]||null> == null:
+      - flag server marallyzen_dictaphones.<[id]>.sound_mode:none
+      - flag server marallyzen_dictaphones.<[id]>.sound_id:null
+      - flag server marallyzen_dictaphones.<[id]>.sound_radius:16
+    - define support <[record].get[support]>
+    - if !<[support].chunk.is_loaded>:
+      - foreach next
+    - if !<[support].material.is_solid>:
+      - run marallyzen_dictaphone_remove def:<[id]>|null
+    - else:
+      - run marallyzen_dictaphone_spawn_stationary def:<[id]>
+
+marallyzen_dictaphone_rebuild_chunk:
+  type: task
+  debug: false
+  definitions: loaded_chunk
+  script:
+  - foreach <server.flag[marallyzen_dictaphones].keys||<list[]>> as:id:
+    - define record <server.flag[marallyzen_dictaphones.<[id]>]>
+    - if <[record].get[support].chunk> != <[loaded_chunk]>:
+      - foreach next
+    - if <server.has_flag[marallyzen_dictaphone_spawning.<[id]>]>:
+      - foreach next
+    - if !<[record].get[support].material.is_solid>:
+      - run marallyzen_dictaphone_remove def:<[id]>|null
+    - else if !<[record].get[display].is_spawned||false> || !<[record].get[interaction].is_spawned||false>:
+      - run marallyzen_dictaphone_spawn_stationary def:<[id]>
+
+marallyzen_dictaphone_open:
+  type: task
+  debug: false
+  definitions: id|viewer
+  script:
+  - if <[viewer].has_flag[marallyzen_dictaphone_opening]>:
+    - stop
+  - flag <[viewer]> marallyzen_dictaphone_opening expire:3s
+  - if <[viewer].has_flag[marallyzen_dictaphone_session]>:
+    - run marallyzen_dictaphone_close def:<[viewer]>|false
+    - wait 1t
+  - define record <server.flag[marallyzen_dictaphones.<[id]>]||null>
+  - if <[record]> == null:
+    - flag <[viewer]> marallyzen_dictaphone_opening:!
+    - stop
+  - define stationary <[record].get[display]||null>
+  - if !<[stationary].is_spawned||false>:
+    - run marallyzen_dictaphone_spawn_stationary def:<[id]>
+    - define stationary <server.flag[marallyzen_dictaphones.<[id]>.display]>
+  - adjust <[viewer]> hide_entity:<[stationary]>
+  - define origin <[record].get[position]>
+  - define direction <[viewer].eye_location.sub[<[origin]>].normalize>
+  - define view_distance <script[marallyzen_dictaphone_config].data_key[view_distance]>
+  - define target <[origin].add[<[direction].mul[<[view_distance]>]>].add[0,0.5,0].face[<[viewer].eye_location>].with_pitch[0]>
+  - define view_yaw <[target].yaw>
+  - define view_origin <[origin].with_yaw[<[view_yaw]>].with_pitch[0]>
+  - spawn item_display[item=paper[item_model=marallyzen:dictaphone];display=fixed;pivot=center;scale=0.96,0.96,0.96;interpolation_duration=5t;teleport_duration=5t;view_range=32;shadow_radius=0] <[view_origin]> save:view_model
+  - define model <entry[view_model].spawned_entity||null>
+  - if <[model]> == null || !<[model].is_spawned||false>:
+    - adjust <[viewer]> show_entity:<[stationary]>
+    - flag <[viewer]> marallyzen_dictaphone_opening:!
+    - stop
+  - flag <[model]> dictaphone_id:<[id]>
+  - flag <[model]> dictaphone_role:session_model
+  - flag <[model]> dictaphone_session_owner:<[viewer].uuid>
+  - adjust <[model]> hide_from_players
+  - adjust <[viewer]> show_entity:<[model]>
+  - define interaction_location <[target].sub[0,0.18,0]>
+  - spawn interaction[width=0.82;height=0.58;is_aware=true] <[interaction_location]> save:view_interaction
+  - define interaction <entry[view_interaction].spawned_entity>
+  - flag <[interaction]> dictaphone_id:<[id]>
+  - flag <[interaction]> dictaphone_role:session_interaction
+  - flag <[interaction]> dictaphone_session_owner:<[viewer].uuid>
+  - adjust <[interaction]> hide_from_players
+  - adjust <[viewer]> show_entity:<[interaction]>
+  - define entities <list[<[model]>|<[interaction]>]>
+  - define moving <list[<[model]>]>
+  - define session_key <util.random_uuid>
+  - flag <[viewer]> marallyzen_dictaphone_session:map@[session_key=<[session_key]>;dictaphone_id=<[id]>;stationary=<[stationary]>;entities=<[entities]>;moving=<[moving]>;model=<[model]>;interaction=<[interaction]>;origin=<[view_origin]>;target=<[target]>;busy=true;sway_frame=1;sound_mode=<[record].get[sound_mode]||none>;sound_id=<[record].get[sound_id]||null>;sound_radius=<[record].get[sound_radius]||16>]
+  - flag <[viewer]> marallyzen_dictaphone_opening:!
+  - run marallyzen_dictaphone_animate_out def:<[viewer]>
+
+marallyzen_dictaphone_animate_out:
+  type: task
+  debug: false
+  definitions: viewer
+  script:
+  - define session <[viewer].flag[marallyzen_dictaphone_session]||null>
+  - if <[session]> == null:
+    - stop
+  - define origin <[session].get[origin]>
+  - define target <[session].get[target]>
+  - define delta <[target].sub[<[origin]>]>
+  - define model <[session].get[model]>
+  - define step <script[marallyzen_dictaphone_config].data_key[animation_step]>
+  - adjust <[model]> teleport_duration:<[step]>
+  - adjust <[model]> interpolation_duration:<[step]>
+  # Keep the spawn and first movement packets separate to prevent the client
+  # from visually skipping the launch beat.
+  - wait 1t
+  - if !<[viewer].has_flag[marallyzen_dictaphone_session]>:
+    - stop
+  # easeOutCubic-inspired travel with a compact vertical arc. The fourth beat
+  # passes the target by 4%, then settles back; rotation and scale share the
+  # same rhythm so the device feels like one solid object with real inertia.
+  # travel progress, vertical arc, X rotation degrees, uniform scale
+  - define frames <list[0.488,0.16,18,0.975|0.784,0.31,48,1.012|0.936,0.25,76,1.032|1.04,0.07,94,1.014|1,0,90,1]>
+  - foreach <[frames]> as:frame:
+    - define values <[frame].split[,]>
+    - define frame_location <[origin].add[<[delta].mul[<[values].get[1]>]>].add[0,<[values].get[2]>,0]>
+    - teleport <[session].get[moving]> <[frame_location]>
+    - adjust <[model]> interpolation_start:0t
+    # Marallyzen turns the top panel toward the camera with X=90 degrees and
+    # simultaneously rolls it by Z=180 degrees. Without the Z rotation the
+    # recorder arrives upside down.
+    - define z_angle <[values].get[3].mul[2].to_radians>
+    - adjust <[model]> left_rotation:<location[0,0,1].to_axis_angle_quaternion[<[z_angle]>]>
+    - adjust <[model]> right_rotation:<location[1,0,0].to_axis_angle_quaternion[<[values].get[3].to_radians>]>
+    - adjust <[model]> scale:<[values].get[4]>,<[values].get[4]>,<[values].get[4]>
+    - wait <[step]>
+    - if !<[viewer].has_flag[marallyzen_dictaphone_session]>:
+      - stop
+  - flag <[viewer]> marallyzen_dictaphone_session.busy:false
+  - playsound <[viewer]> sound:block_iron_trapdoor_open volume:0.28 pitch:1.65
+  - run marallyzen_dictaphone_playback_start def:<[viewer]>
+  - run marallyzen_dictaphone_session_monitor def:<[viewer]>|<[session].get[session_key]>
+
+marallyzen_dictaphone_session_monitor:
+  type: task
+  debug: false
+  definitions: viewer|session_key
+  script:
+  - while <[viewer].is_online||false> && <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> == <[session_key]>:
+    - define session <[viewer].flag[marallyzen_dictaphone_session]>
+    - if <[viewer].world> != <[session].get[target].world> || <[viewer].eye_location.distance[<[session].get[target]>]> > 5:
+      - run marallyzen_dictaphone_close def:<[viewer]>|true
+      - stop
+    - define wait_time 2t
+    - if !<[session].get[busy]>:
+      - define frames <script[marallyzen_dictaphone_config].data_key[sway_frames]>
+      - define frame_index <[session].get[sway_frame]||1>
+      - define values <[frames].get[<[frame_index]>].split[,]>
+      - define x_angle <element[90].add[<[values].get[1]>].to_radians>
+      - define y_angle <[values].get[2]>
+      - define wait_time <[values].get[3]>
+      - adjust <[session].get[model]> interpolation_duration:<[wait_time]>
+      - adjust <[session].get[model]> teleport_duration:<[wait_time]>
+      - adjust <[session].get[model]> interpolation_start:0t
+      # Keep the required 180-degree roll in model space. Horizontal wind is
+      # expressed through display yaw so it composes cleanly with that roll.
+      - adjust <[session].get[model]> left_rotation:<location[0,0,1].to_axis_angle_quaternion[3.141592654]>
+      - adjust <[session].get[model]> right_rotation:<location[1,0,0].to_axis_angle_quaternion[<[x_angle]>]>
+      - define sway_yaw <[session].get[target].yaw.add[<[y_angle]>]>
+      - teleport <[session].get[model]> <[session].get[target].with_yaw[<[sway_yaw]>]>
+      - define frame_index <[frame_index].add[1]>
+      - if <[frame_index]> > <[frames].size>:
+        - define frame_index 1
+      - flag <[viewer]> marallyzen_dictaphone_session.sway_frame:<[frame_index]>
+    - wait <[wait_time]>
+
+marallyzen_dictaphone_close:
+  type: task
+  debug: false
+  definitions: viewer|animate
+  script:
+  - define session <[viewer].flag[marallyzen_dictaphone_session]||null>
+  - if <[session]> == null:
+    - stop
+  - flag <[viewer]> marallyzen_dictaphone_session.busy:true
+  - run marallyzen_dictaphone_playback_stop def:<[viewer]>
+  - define entities <[session].get[entities]>
+  - if <[animate]> && <[viewer].is_online||false> && <[viewer].world> == <[session].get[origin].world>:
+    - define model <[session].get[model]>
+    - define origin <[session].get[origin]>
+    - define target <[session].get[target]>
+    - define return_delta <[origin].sub[<[target]>]>
+    - define step <script[marallyzen_dictaphone_config].data_key[animation_step]>
+    - define sway_frames <script[marallyzen_dictaphone_config].data_key[sway_frames]>
+    - define wind_index <[session].get[sway_frame]||1>
+    # A quick anticipation beat lifts the recorder a fraction before it dives
+    # home. Live wind, face rotation and scale inertia all damp into the exact
+    # stationary pose during the same five-beat cadence.
+    # return progress, vertical arc, X rotation degrees, uniform scale
+    - define return_frames <list[0.10,0.07,82,1.014|0.34,0.19,61,1.028|0.66,0.24,31,1.012|0.89,0.11,8,0.978|1,0,0,0.96]>
+    - playsound <[viewer]> sound:block_iron_trapdoor_close volume:0.25 pitch:1.55
+    - foreach <[return_frames]> as:frame:
+      - define values <[frame].split[,]>
+      - define damping <[values].get[3].div[90]>
+      - define wind <[sway_frames].get[<[wind_index]>].split[,]>
+      - define x_angle <[values].get[3].add[<[wind].get[1].mul[<[damping]>]>].to_radians>
+      - define y_angle <[wind].get[2].mul[<[damping]>]>
+      - define z_angle <[values].get[3].mul[2].to_radians>
+      - define frame_location <[target].add[<[return_delta].mul[<[values].get[1]>]>].add[0,<[values].get[2]>,0]>
+      - adjust <[model]> teleport_duration:<[step]>
+      - adjust <[model]> interpolation_duration:<[step]>
+      - adjust <[model]> interpolation_start:0t
+      - adjust <[model]> left_rotation:<location[0,0,1].to_axis_angle_quaternion[<[z_angle]>]>
+      - adjust <[model]> right_rotation:<location[1,0,0].to_axis_angle_quaternion[<[x_angle]>]>
+      - adjust <[model]> scale:<[values].get[4]>,<[values].get[4]>,<[values].get[4]>
+      - define return_yaw <[origin].yaw.add[<[y_angle]>]>
+      - teleport <[session].get[moving]> <[frame_location].with_yaw[<[return_yaw]>]>
+      - define wind_index <[wind_index].add[1]>
+      - if <[wind_index]> > <[sway_frames].size>:
+        - define wind_index 1
+      - wait <[step]>
+      - if !<[viewer].has_flag[marallyzen_dictaphone_session]>:
+        - stop
+    - playsound <[viewer]> sound:block_wood_place volume:0.35 pitch:1.55
+  - foreach <[entities]> as:entity:
+    - if <[entity].is_spawned||false>:
+      - remove <[entity]>
+  - define stationary <[session].get[stationary]||null>
+  - if <[stationary]> != null && <[stationary].is_spawned||false>:
+    - adjust <[viewer]> show_entity:<[stationary]>
+  - flag <[viewer]> marallyzen_dictaphone_session:!
+
+# Stable extension seam for the next phase. The spawn/open/close code does not
+# need to change when sound support is enabled; only these two tasks do.
+marallyzen_dictaphone_playback_start:
+  type: task
+  debug: false
+  definitions: viewer
+  script:
+  - define session <[viewer].flag[marallyzen_dictaphone_session]||null>
+  - if <[session]> == null || <[session].get[sound_mode]||none> == none:
+    - stop
+  # Reserved for local/global playback implementation.
+
+marallyzen_dictaphone_playback_stop:
+  type: task
+  debug: false
+  definitions: viewer
+  script:
+  - define session <[viewer].flag[marallyzen_dictaphone_session]||null>
+  - if <[session]> == null || <[session].get[sound_mode]||none> == none:
+    - stop
+  # Reserved for stopping looped or externally streamed playback.
