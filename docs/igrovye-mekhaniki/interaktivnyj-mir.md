@@ -4,7 +4,7 @@
 
 Настенные плакаты — не обычные картины. При взаимодействии они отлетают от стены, переворачиваются и покачиваются, после чего плавно возвращаются на место. Некоторые варианты могут менять внешний вид.
 
-<figure><img src="../.gitbook/assets/image_2026-08-23_23-01-21.jpg" alt="" width="208"><figcaption></figcaption></figure>
+<div align="left"><figure><img src="../.gitbook/assets/image_2026-08-23_23-01-21.jpg" alt="" width="104"><figcaption></figcaption></figure></div>
 
 ## Диктофоны
 
@@ -16,8 +16,6 @@
 4. возвращение диктофона на землю.
 
 Запись слышит только активировавший её игрок. Повторный клик во время воспроизведения не прерывает сцену.
-
-<figure><img src="../.gitbook/assets/image.png" alt=""><figcaption></figcaption></figure>
 
 ## Фантомные предметы
 
