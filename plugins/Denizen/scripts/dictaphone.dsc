@@ -639,7 +639,9 @@ marallyzen_dictaphone_narration:
   - if <[lines].is_empty>:
     - stop
   - define speaker <server.flag[marallyzen_dictaphone_narrations.<[audio_file]>.speaker]||null>
-  - define total_ticks <[sound_duration].in_ticks.round_down>
+  # Task definitions arrive as ElementTags in this Denizen DEV build. Cast the
+  # stored value (for example "75t") back to DurationTag before reading ticks.
+  - define total_ticks <[sound_duration].as[duration].in_ticks>
   - define line_count <[lines].size>
   - define segment_ticks <[total_ticks].div[<[line_count]>].round_down>
   - if <[segment_ticks]> < 1:
