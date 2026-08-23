@@ -525,15 +525,15 @@ marallyzen_dictaphone_playback_start:
   # Mechanical start, selected lore recording, mechanical stop. Every wait is
   # followed by a session-key check so cancel/movement/reload cannot revive an
   # obsolete playback queue or close a newer dictaphone session.
-  - playsound <[viewer]> sound:<[start_sound]> custom sound_category:voice volume:1 pitch:1
+  - execute as_server "execute at <[viewer].name> run minecraft:playsound <[start_sound]> voice <[viewer].name> ~ ~ ~ 1 1 0" silent
   - wait <script[marallyzen_dictaphone_config].data_key[start_duration]>
   - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
     - stop
-  - playsound <[viewer]> sound:<[sound_id]> custom sound_category:voice volume:1 pitch:1
+  - execute as_server "execute at <[viewer].name> run minecraft:playsound <[sound_id]> voice <[viewer].name> ~ ~ ~ 1 1 0" silent
   - wait <[session].get[sound_duration]>
   - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
     - stop
-  - playsound <[viewer]> sound:<[stop_sound]> custom sound_category:voice volume:1 pitch:1
+  - execute as_server "execute at <[viewer].name> run minecraft:playsound <[stop_sound]> voice <[viewer].name> ~ ~ ~ 1 1 0" silent
   - wait <script[marallyzen_dictaphone_config].data_key[stop_duration]>
   - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
     - stop
@@ -548,8 +548,8 @@ marallyzen_dictaphone_playback_stop:
   - define session <[viewer].flag[marallyzen_dictaphone_session]||null>
   - if <[session]> == null || <[session].get[playback_finished]||false>:
     - stop
-  # PlayerTag.stop_sound accepts either a category or a full namespaced key.
-  # Stop all three possible stages when a session is cancelled early.
-  - adjust <[viewer]> stop_sound:<script[marallyzen_dictaphone_config].data_key[start_sound]>
-  - adjust <[viewer]> stop_sound:<[session].get[sound_id]>
-  - adjust <[viewer]> stop_sound:<script[marallyzen_dictaphone_config].data_key[stop_sound]>
+  # Use the vanilla command path here as well, keeping start/play/stop on the
+  # same protocol and avoiding custom-sound parsing differences in DEV builds.
+  - execute as_server "minecraft:stopsound <[viewer].name> voice <script[marallyzen_dictaphone_config].data_key[start_sound]>" silent
+  - execute as_server "minecraft:stopsound <[viewer].name> voice <[session].get[sound_id]>" silent
+  - execute as_server "minecraft:stopsound <[viewer].name> voice <script[marallyzen_dictaphone_config].data_key[stop_sound]>" silent
