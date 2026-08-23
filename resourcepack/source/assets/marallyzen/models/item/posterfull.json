@@ -1,0 +1,4 @@
+{
+  "parent": "marallyzen:item/posterfull_base",
+  "textures": { "poster": "marallyzen:block/posterfull" }
+}

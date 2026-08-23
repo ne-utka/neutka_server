@@ -1,0 +1,4 @@
+{
+  "parent": "marallyzen:item/posterwall_base",
+  "textures": { "poster": "marallyzen:block/poster7" }
+}

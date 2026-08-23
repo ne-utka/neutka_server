@@ -1,0 +1,23 @@
+{
+  "textures": {
+    "particle": "#poster",
+    "poster": "minecraft:missingno"
+  },
+  "elements": [
+    {
+      "from": [1.6, 0, 7.96875],
+      "to": [14.4, 16, 8.03125],
+      "faces": {
+        "north": { "uv": [0, 0, 16, 16], "texture": "#poster" },
+        "south": { "uv": [16, 0, 0, 16], "texture": "#poster" }
+      }
+    }
+  ],
+  "display": {
+    "fixed": {
+      "rotation": [0, 180, 0],
+      "translation": [0, 0, 0],
+      "scale": [1, 1, 1]
+    }
+  }
+}
