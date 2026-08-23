@@ -81,7 +81,7 @@ marallyzen_dictaphone_command:
     # tracing. The support carries the same persistent ID, so use it as the
     # precise fallback for commands aimed at a stationary dictaphone.
     - if <[id]> == null:
-      - define support <player.cursor_on[6]>
+      - define support <player.eye_location.ray_trace[range=6;return=block]||null>
       - define id <[support].flag[marallyzen_dictaphone_id]||null>
     - if <[id]> == null:
       - narrate "<yellow>Посмотрите на диктофон в пределах 6 блоков."
@@ -119,7 +119,7 @@ marallyzen_dictaphone_command:
         - narrate "<red>Укажите аудиофайл из подсказки команды."
         - narrate "<gray>Пример<&co> <white>/dictaphone spawn 05_dictaphone_prompt"
         - stop
-      - define support <player.cursor_on[6]>
+      - define support <player.eye_location.ray_trace[range=6;return=block]||null>
       - if <[support]> == null || !<[support].material.is_solid>:
         - narrate "<yellow>Посмотрите на верхнюю грань твёрдого блока в пределах 6 блоков."
         - stop
@@ -134,7 +134,7 @@ marallyzen_dictaphone_command:
       - define target <player.eye_location.ray_trace_target[range=6;entities=item_display|interaction].hit_entity||null>
       - define id <[target].flag[dictaphone_id]||null>
       - if <[id]> == null:
-        - define support <player.cursor_on[6]>
+        - define support <player.eye_location.ray_trace[range=6;return=block]||null>
         - define id <[support].flag[marallyzen_dictaphone_id]||null>
       - if <[id]> == null:
         - narrate "<yellow>Посмотрите на диктофон в пределах 6 блоков."
