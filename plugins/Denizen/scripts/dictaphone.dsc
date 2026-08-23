@@ -525,15 +525,15 @@ marallyzen_dictaphone_playback_start:
   # Mechanical start, selected lore recording, mechanical stop. Every wait is
   # followed by a session-key check so cancel/movement/reload cannot revive an
   # obsolete playback queue or close a newer dictaphone session.
-  - execute as_server "execute at <[viewer].name> run minecraft:playsound <[start_sound]> voice <[viewer].name> ~ ~ ~ 1 1 0" silent
+  - execute as_server "execute at <[viewer].name> run minecraft:playsound <[start_sound].unescaped> voice <[viewer].name> ~ ~ ~ 1 1 0" silent
   - wait <script[marallyzen_dictaphone_config].data_key[start_duration]>
   - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
     - stop
-  - execute as_server "execute at <[viewer].name> run minecraft:playsound <[sound_id]> voice <[viewer].name> ~ ~ ~ 1 1 0" silent
+  - execute as_server "execute at <[viewer].name> run minecraft:playsound <[sound_id].unescaped> voice <[viewer].name> ~ ~ ~ 1 1 0" silent
   - wait <[session].get[sound_duration]>
   - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
     - stop
-  - execute as_server "execute at <[viewer].name> run minecraft:playsound <[stop_sound]> voice <[viewer].name> ~ ~ ~ 1 1 0" silent
+  - execute as_server "execute at <[viewer].name> run minecraft:playsound <[stop_sound].unescaped> voice <[viewer].name> ~ ~ ~ 1 1 0" silent
   - wait <script[marallyzen_dictaphone_config].data_key[stop_duration]>
   - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
     - stop
@@ -550,6 +550,6 @@ marallyzen_dictaphone_playback_stop:
     - stop
   # Use the vanilla command path here as well, keeping start/play/stop on the
   # same protocol and avoiding custom-sound parsing differences in DEV builds.
-  - execute as_server "minecraft:stopsound <[viewer].name> voice <script[marallyzen_dictaphone_config].data_key[start_sound]>" silent
-  - execute as_server "minecraft:stopsound <[viewer].name> voice <[session].get[sound_id]>" silent
-  - execute as_server "minecraft:stopsound <[viewer].name> voice <script[marallyzen_dictaphone_config].data_key[stop_sound]>" silent
+  - execute as_server "minecraft:stopsound <[viewer].name> voice <script[marallyzen_dictaphone_config].data_key[start_sound].unescaped>" silent
+  - execute as_server "minecraft:stopsound <[viewer].name> voice <[session].get[sound_id].unescaped>" silent
+  - execute as_server "minecraft:stopsound <[viewer].name> voice <script[marallyzen_dictaphone_config].data_key[stop_sound].unescaped>" silent
