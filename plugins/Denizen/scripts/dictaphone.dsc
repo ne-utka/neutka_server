@@ -51,7 +51,7 @@ marallyzen_dictaphone_command:
   aliases:
   - dict
   description: Управление серверными диктофонами Marallyzen
-  usage: /dictaphone spawn [audio_file] | remove | info | rebuild | cancel
+  usage: /dictaphone spawn [audio_file] | narration [set|add|speaker|list|clear] [audio_file] [text] | remove | info | rebuild | cancel
   permission: marallyzen.dictaphone.use
   permission message: <red>Недостаточно прав.
   tab complete:
@@ -60,9 +60,13 @@ marallyzen_dictaphone_command:
     - define admin <player.is_op.or[<player.has_permission[marallyzen.dictaphone.admin]>]>
   - if <context.args.size> <= 1:
     - if <[admin]>:
-      - determine spawn|remove|info|rebuild|cancel
+      - determine spawn|narration|remove|info|rebuild|cancel
     - determine info|cancel
   - if <context.args.size> == 2 && <context.args.get[1].to_lowercase||null> == spawn && <[admin]>:
+    - determine <script[marallyzen_dictaphone_config].data_key[audio_files].keys>
+  - if <context.args.size> == 2 && <context.args.get[1].to_lowercase||null> == narration && <[admin]>:
+    - determine set|add|speaker|list|clear
+  - if <context.args.size> == 3 && <context.args.get[1].to_lowercase||null> == narration && <[admin]>:
     - determine <script[marallyzen_dictaphone_config].data_key[audio_files].keys>
   - determine <list[]>
   script:
@@ -127,6 +131,54 @@ marallyzen_dictaphone_command:
         - narrate "<red>На этом блоке уже стоит диктофон."
         - stop
       - run marallyzen_dictaphone_create def:<[support]>|<player>|<[audio_key]>|<[audio_data].get[sound_id]>|<[audio_data].get[duration]>
+    - case narration:
+      - define action <context.args.get[2].to_lowercase||help>
+      - define audio_key <context.args.get[3].to_lowercase.replace[.ogg].with[]||null>
+      - define audio_catalog <script[marallyzen_dictaphone_config].data_key[audio_files]>
+      - if !<list[set|add|speaker|list|clear].contains[<[action]>]> || <[audio_key]> == null || !<[audio_catalog].contains[<[audio_key]>]>:
+        - narrate "<gray>Настройка нарраций для записи<&co>"
+        - narrate "<white>/dictaphone narration set <audio_file> <text> <gray>— заменить все реплики одной"
+        - narrate "<white>/dictaphone narration add <audio_file> <text> <gray>— добавить следующую реплику"
+        - narrate "<white>/dictaphone narration speaker <audio_file> <name> <gray>— белая подпись говорящего; <white>- <gray>скрывает её"
+        - narrate "<white>/dictaphone narration list <audio_file> <gray>— показать настройку"
+        - narrate "<white>/dictaphone narration clear <audio_file> <gray>— удалить наррацию"
+        - stop
+      - if <[action]> == list:
+        - define lines <server.flag[marallyzen_dictaphone_narrations.<[audio_key]>.lines]||<list[]>>
+        - define speaker <server.flag[marallyzen_dictaphone_narrations.<[audio_key]>.speaker]||без подписи>
+        - narrate "<gray>Запись<&co> <white><[audio_key]>.ogg"
+        - narrate "<gray>Говорящий<&co> <white><[speaker]>"
+        - if <[lines].is_empty>:
+          - narrate "<gray>Реплик пока нет."
+        - else:
+          - foreach <[lines]> as:line:
+            - narrate "<gray><[loop_index]>. <white><[line].parse_color>"
+        - stop
+      - if <[action]> == clear:
+        - flag server marallyzen_dictaphone_narrations.<[audio_key]>:!
+        - narrate "<green>Наррация для <white><[audio_key]>.ogg <green>удалена."
+        - stop
+      - if <context.args.size> < 4:
+        - narrate "<red>После имени аудио укажите текст."
+        - stop
+      - define text <context.args.get[4].to[last].space_separated||null>
+      - if <[text]> == null:
+        - narrate "<red>После имени аудио укажите текст."
+        - stop
+      - choose <[action]>:
+        - case set:
+          - flag server marallyzen_dictaphone_narrations.<[audio_key]>.lines:<list[<[text]>]>
+          - narrate "<green>Наррация <white><[audio_key]>.ogg <green>заменена одной репликой."
+        - case add:
+          - flag server marallyzen_dictaphone_narrations.<[audio_key]>.lines:->:<[text]>
+          - narrate "<green>Реплика добавлена к <white><[audio_key]>.ogg<green>."
+        - case speaker:
+          - if <[text]> == -:
+            - flag server marallyzen_dictaphone_narrations.<[audio_key]>.speaker:!
+            - narrate "<green>Подпись говорящего скрыта."
+          - else:
+            - flag server marallyzen_dictaphone_narrations.<[audio_key]>.speaker:<[text]>
+            - narrate "<green>Говорящий для <white><[audio_key]>.ogg<green><&co> <white><[text]>"
     - case remove:
       - if !<player.exists||false>:
         - narrate "Команда доступна только игроку."
@@ -145,6 +197,7 @@ marallyzen_dictaphone_command:
       - narrate "<green>Проверка и восстановление диктофонов запущены."
     - default:
       - narrate "<gold>/dictaphone spawn <white>[audio_file] <gray>— поставить диктофон с выбранной записью"
+      - narrate "<gold>/dictaphone narration <white>[set|add|speaker|list|clear] [audio_file] <gray>— настроить наррацию"
       - narrate "<gold>/dictaphone remove <gray>— удалить диктофон, на который вы смотрите"
       - narrate "<gold>/dictaphone info | rebuild | cancel"
 
@@ -535,6 +588,7 @@ marallyzen_dictaphone_playback_start:
   - if <[session].get[model].is_spawned||false>:
     - adjust <[session].get[model]> item:paper[item_model=marallyzen:dictaphone_animation]
   - execute as_server "execute at <[viewer].name> run minecraft:playsound <[sound_id].parsed> voice <[viewer].name> ~ ~ ~ 1 1 0" silent
+  - run marallyzen_dictaphone_narration def:<[viewer]>|<[session_key]>|<[session].get[audio_file]>|<[session].get[sound_duration]>
   - wait <[session].get[sound_duration]>
   - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
     - stop
@@ -547,6 +601,46 @@ marallyzen_dictaphone_playback_start:
   - flag <[viewer]> marallyzen_dictaphone_session.playback_finished:true
   - run marallyzen_dictaphone_close def:<[viewer]>|true
 
+marallyzen_dictaphone_narration:
+  type: task
+  debug: false
+  definitions: viewer|session_key|audio_file|sound_duration
+  script:
+  - define lines <server.flag[marallyzen_dictaphone_narrations.<[audio_file]>.lines]||<list[]>>
+  - if <[lines].is_empty>:
+    - stop
+  - define speaker <server.flag[marallyzen_dictaphone_narrations.<[audio_file]>.speaker]||null>
+  - define total_ticks <[sound_duration].in_ticks.round_down>
+  - define line_count <[lines].size>
+  - define segment_ticks <[total_ticks].div[<[line_count]>].round_down>
+  - if <[segment_ticks]> < 1:
+    - define segment_ticks 1
+  # The original mod spreads narration beats across the voice recording. The
+  # final line receives the remainder so the actionbar ends exactly with audio.
+  - foreach <[lines]> as:line:
+    - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
+      - stop
+    - define wait_ticks <[segment_ticks]>
+    - if <[loop_index]> == <[line_count]>:
+      - define wait_ticks <[total_ticks].sub[<[segment_ticks].mul[<[line_count].sub[1]>]>]>
+    - define remaining_ticks <[wait_ticks]>
+    # Refresh every two seconds so a long single subtitle cannot fade before
+    # its section of the recording has finished.
+    - while <[remaining_ticks]> > 0:
+      - if <[speaker]> == null:
+        - actionbar "<gray><[line].parse_color>" targets:<[viewer]>
+      - else:
+        - actionbar "<white><[speaker].parse_color><gray><&co> <[line].parse_color>" targets:<[viewer]>
+      - define refresh_ticks 40
+      - if <[remaining_ticks]> < <[refresh_ticks]>:
+        - define refresh_ticks <[remaining_ticks]>
+      - wait <[refresh_ticks]>t
+      - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
+        - stop
+      - define remaining_ticks <[remaining_ticks].sub[<[refresh_ticks]>]>
+  - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> == <[session_key]>:
+    - actionbar "" targets:<[viewer]>
+
 marallyzen_dictaphone_playback_stop:
   type: task
   debug: false
@@ -557,6 +651,7 @@ marallyzen_dictaphone_playback_stop:
     - stop
   - if <[session].get[model].is_spawned||false>:
     - adjust <[session].get[model]> item:paper[item_model=marallyzen:dictaphone]
+  - actionbar "" targets:<[viewer]>
   # Use the vanilla command path here as well, keeping start/play/stop on the
   # same protocol and avoiding custom-sound parsing differences in DEV builds.
   - execute as_server "minecraft:stopsound <[viewer].name> voice <script[marallyzen_dictaphone_config].data_key[start_sound].parsed>" silent
