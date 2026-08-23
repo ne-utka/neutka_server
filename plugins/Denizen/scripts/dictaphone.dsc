@@ -529,10 +529,17 @@ marallyzen_dictaphone_playback_start:
   - wait <script[marallyzen_dictaphone_config].data_key[start_duration]>
   - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
     - stop
+  # The original NeoForge renderer enables DictaphoneBlock.ANIMATED exactly
+  # while narration is active. Mirror that state by swapping only the displayed
+  # ItemStack model; position, rotations and wind interpolation remain intact.
+  - if <[session].get[model].is_spawned||false>:
+    - adjust <[session].get[model]> item:paper[item_model=marallyzen:dictaphone_animation]
   - execute as_server "execute at <[viewer].name> run minecraft:playsound <[sound_id].parsed> voice <[viewer].name> ~ ~ ~ 1 1 0" silent
   - wait <[session].get[sound_duration]>
   - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
     - stop
+  - if <[session].get[model].is_spawned||false>:
+    - adjust <[session].get[model]> item:paper[item_model=marallyzen:dictaphone]
   - execute as_server "execute at <[viewer].name> run minecraft:playsound <[stop_sound].parsed> voice <[viewer].name> ~ ~ ~ 1 1 0" silent
   - wait <script[marallyzen_dictaphone_config].data_key[stop_duration]>
   - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
@@ -548,6 +555,8 @@ marallyzen_dictaphone_playback_stop:
   - define session <[viewer].flag[marallyzen_dictaphone_session]||null>
   - if <[session]> == null || <[session].get[playback_finished]||false>:
     - stop
+  - if <[session].get[model].is_spawned||false>:
+    - adjust <[session].get[model]> item:paper[item_model=marallyzen:dictaphone]
   # Use the vanilla command path here as well, keeping start/play/stop on the
   # same protocol and avoiding custom-sound parsing differences in DEV builds.
   - execute as_server "minecraft:stopsound <[viewer].name> voice <script[marallyzen_dictaphone_config].data_key[start_sound].parsed>" silent
