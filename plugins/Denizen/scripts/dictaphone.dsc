@@ -51,7 +51,7 @@ marallyzen_dictaphone_command:
   aliases:
   - dict
   description: Управление серверными диктофонами Marallyzen
-  usage: /dictaphone spawn <audio_file> | remove | info | rebuild | cancel
+  usage: /dictaphone spawn [audio_file] | remove | info | rebuild | cancel
   permission: marallyzen.dictaphone.use
   permission message: <red>Недостаточно прав.
   tab complete:
@@ -135,7 +135,7 @@ marallyzen_dictaphone_command:
       - run marallyzen_dictaphone_rebuild
       - narrate "<green>Проверка и восстановление диктофонов запущены."
     - default:
-      - narrate "<gold>/dictaphone spawn <white><audio_file> <gray>— поставить диктофон с выбранной записью"
+      - narrate "<gold>/dictaphone spawn <white>[audio_file] <gray>— поставить диктофон с выбранной записью"
       - narrate "<gold>/dictaphone remove <gray>— удалить диктофон, на который вы смотрите"
       - narrate "<gold>/dictaphone info | rebuild | cancel"
 
