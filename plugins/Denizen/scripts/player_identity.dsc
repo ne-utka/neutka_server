@@ -51,8 +51,6 @@ marallyzen_identity_interact:
     # Sneaking is the discreet identification path: name only.
     - if <[actor].is_sneaking>:
       - actionbar "<gray>Вы аккуратно коснулись плеча <white><[target].name><gray>." targets:<[actor]>
-      - if !<[target].is_npc>:
-        - actionbar "<white><[actor].name><gray> аккуратно касается вашего плеча." targets:<[target]>
       - stop
 
     - animate <[actor]> animation:ARM_SWING
