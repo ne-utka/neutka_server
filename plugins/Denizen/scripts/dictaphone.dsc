@@ -2,10 +2,8 @@
 # No Citizens, Depenizen or client mod is required.
 # Persistent records are stored under server flag "marallyzen_dictaphones".
 #
-# Audio-ready record fields (currently intentionally silent):
-# sound_mode = none | local | global
-# sound_id = namespaced Minecraft/resource-pack sound id
-# sound_radius = intended positional radius for local playback
+# Every placed dictaphone stores its own resource-pack sound and exact playback
+# duration. Sound is sent only to the player who activated the dictaphone.
 
 marallyzen_dictaphone_config:
   type: data
@@ -13,6 +11,22 @@ marallyzen_dictaphone_config:
   use_permission: marallyzen.dictaphone.use
   admin_permission: marallyzen.dictaphone.admin
   view_distance: 1.5
+  start_sound: marallyzen:dictophone_start
+  start_duration: 10t
+  stop_sound: marallyzen:dictophone_stop
+  stop_duration: 19t
+  # Add future recordings here. The key is what admins type after "spawn".
+  # Duration is rounded up to a whole server tick so sounds never overlap.
+  audio_files:
+    05_dictaphone_prompt:
+      sound_id: marallyzen:quest/test_world_quest/05_dictaphone_prompt
+      duration: 75t
+    06_dictaphone_done_1:
+      sound_id: marallyzen:quest/test_world_quest/06_dictaphone_done_1
+      duration: 32t
+    07_dictaphone_done_2:
+      sound_id: marallyzen:quest/test_world_quest/07_dictaphone_done_2
+      duration: 27t
   # Five three-tick client-interpolated beats: 0.75 seconds total. This keeps
   # the motion responsive while still leaving enough frames for a cinematic
   # launch, controlled overshoot and settle.
@@ -37,7 +51,7 @@ marallyzen_dictaphone_command:
   aliases:
   - dict
   description: Управление серверными диктофонами Marallyzen
-  usage: /dictaphone spawn | remove | info | rebuild | cancel
+  usage: /dictaphone spawn <audio_file> | remove | info | rebuild | cancel
   permission: marallyzen.dictaphone.use
   permission message: <red>Недостаточно прав.
   tab complete:
@@ -48,6 +62,8 @@ marallyzen_dictaphone_command:
     - if <[admin]>:
       - determine spawn|remove|info|rebuild|cancel
     - determine info|cancel
+  - if <context.args.size> == 2 && <context.args.get[1].to_lowercase||null> == spawn && <[admin]>:
+    - determine <script[marallyzen_dictaphone_config].data_key[audio_files].keys>
   - determine <list[]>
   script:
   - define sub <context.args.get[1].to_lowercase||help>
@@ -69,7 +85,9 @@ marallyzen_dictaphone_command:
       - narrate "<red>Запись диктофона не найдена."
       - stop
     - narrate "<gold>ID<&co> <white><[id]>"
-    - narrate "<gold>Звук<&co> <white><[record].get[sound_mode]||none> / <[record].get[sound_id]||не назначен>"
+    - narrate "<gold>Аудиофайл<&co> <white><[record].get[audio_file]||не назначен>"
+    - narrate "<gold>Sound ID<&co> <white><[record].get[sound_id]||не назначен>"
+    - narrate "<gold>Длительность<&co> <white><[record].get[sound_duration]||не назначена>"
     - narrate "<gold>Создатель<&co> <white><[record].get[creator]||неизвестен>"
     - stop
   - define admin true
@@ -83,6 +101,18 @@ marallyzen_dictaphone_command:
       - if !<player.exists||false>:
         - narrate "Команда доступна только игроку."
         - stop
+      - define audio_key <context.args.get[2]||null>
+      - if <[audio_key]> == null:
+        - narrate "<red>Укажите аудиофайл из подсказки команды."
+        - narrate "<gray>Пример<&co> <white>/dictaphone spawn 05_dictaphone_prompt"
+        - stop
+      - define audio_key <[audio_key].to_lowercase.replace[.ogg].with[]>
+      - define audio_catalog <script[marallyzen_dictaphone_config].data_key[audio_files]>
+      - define audio_data <[audio_catalog].get[<[audio_key]>]||null>
+      - if <[audio_data]> == null:
+        - narrate "<red>Укажите аудиофайл из подсказки команды."
+        - narrate "<gray>Пример<&co> <white>/dictaphone spawn 05_dictaphone_prompt"
+        - stop
       - define support <player.cursor_on[6]>
       - if <[support]> == null || !<[support].material.is_solid>:
         - narrate "<yellow>Посмотрите на верхнюю грань твёрдого блока в пределах 6 блоков."
@@ -90,7 +120,7 @@ marallyzen_dictaphone_command:
       - if <[support].has_flag[marallyzen_dictaphone_id]>:
         - narrate "<red>На этом блоке уже стоит диктофон."
         - stop
-      - run marallyzen_dictaphone_create def:<[support]>|<player>
+      - run marallyzen_dictaphone_create def:<[support]>|<player>|<[audio_key]>|<[audio_data].get[sound_id]>|<[audio_data].get[duration]>
     - case remove:
       - if !<player.exists||false>:
         - narrate "Команда доступна только игроку."
@@ -105,7 +135,7 @@ marallyzen_dictaphone_command:
       - run marallyzen_dictaphone_rebuild
       - narrate "<green>Проверка и восстановление диктофонов запущены."
     - default:
-      - narrate "<gold>/dictaphone spawn <gray>— поставить на блок, на который вы смотрите"
+      - narrate "<gold>/dictaphone spawn <white><audio_file> <gray>— поставить диктофон с выбранной записью"
       - narrate "<gold>/dictaphone remove <gray>— удалить диктофон, на который вы смотрите"
       - narrate "<gold>/dictaphone info | rebuild | cancel"
 
@@ -168,7 +198,7 @@ marallyzen_dictaphone_events:
 marallyzen_dictaphone_create:
   type: task
   debug: false
-  definitions: support|admin
+  definitions: support|admin|audio_file|sound_id|sound_duration
   script:
   - if !<[support].material.is_solid>:
     - narrate "<red>Диктофону нужна твёрдая опора." targets:<[admin]>
@@ -178,11 +208,11 @@ marallyzen_dictaphone_create:
   # Item models are centred around model-space Y=8. The model starts at Y=0,
   # so its display origin is placed half a block above the supporting surface.
   - define position <[support].center.add[0,1,0].with_yaw[<[yaw]>].with_pitch[0]>
-  - flag server marallyzen_dictaphones.<[id]>:map@[position=<[position]>;support=<[support]>;yaw=<[yaw]>;creator=<[admin].uuid>;sound_mode=none;sound_id=null;sound_radius=16]
+  - flag server marallyzen_dictaphones.<[id]>:map@[position=<[position]>;support=<[support]>;yaw=<[yaw]>;creator=<[admin].uuid>;audio_file=<[audio_file]>;sound_mode=local;sound_id=<[sound_id]>;sound_duration=<[sound_duration]>]
   - flag <[support]> marallyzen_dictaphone_id:<[id]>
   - run marallyzen_dictaphone_spawn_stationary def:<[id]>
   - playsound <[position]> sound:block_wood_place volume:0.55 pitch:1.35
-  - narrate "<green>Диктофон установлен. ID<&co> <[id]>" targets:<[admin]>
+  - narrate "<green>Диктофон установлен. <gray>Запись<&co> <white><[audio_file]>.ogg" targets:<[admin]>
 
 marallyzen_dictaphone_spawn_stationary:
   type: task
@@ -246,11 +276,12 @@ marallyzen_dictaphone_rebuild:
   script:
   - foreach <server.flag[marallyzen_dictaphones].keys||<list[]>> as:id:
     - define record <server.flag[marallyzen_dictaphones.<[id]>]>
-    # Forward-compatible defaults for records made before audio is implemented.
+    # Safe defaults for legacy dictaphones placed before per-device audio.
     - if <[record].get[sound_mode]||null> == null:
       - flag server marallyzen_dictaphones.<[id]>.sound_mode:none
       - flag server marallyzen_dictaphones.<[id]>.sound_id:null
-      - flag server marallyzen_dictaphones.<[id]>.sound_radius:16
+      - flag server marallyzen_dictaphones.<[id]>.sound_duration:null
+      - flag server marallyzen_dictaphones.<[id]>.audio_file:null
     - define support <[record].get[support]>
     - if !<[support].chunk.is_loaded>:
       - foreach next
@@ -290,6 +321,10 @@ marallyzen_dictaphone_open:
   - if <[record]> == null:
     - flag <[viewer]> marallyzen_dictaphone_opening:!
     - stop
+  - if <[record].get[sound_id]||null> == null || <[record].get[sound_duration]||null> == null:
+    - actionbar "<gray>В этом диктофоне нет записи." targets:<[viewer]>
+    - flag <[viewer]> marallyzen_dictaphone_opening:!
+    - stop
   - define stationary <[record].get[display]||null>
   - if !<[stationary].is_spawned||false>:
     - run marallyzen_dictaphone_spawn_stationary def:<[id]>
@@ -323,7 +358,7 @@ marallyzen_dictaphone_open:
   - define entities <list[<[model]>|<[interaction]>]>
   - define moving <list[<[model]>]>
   - define session_key <util.random_uuid>
-  - flag <[viewer]> marallyzen_dictaphone_session:map@[session_key=<[session_key]>;dictaphone_id=<[id]>;stationary=<[stationary]>;entities=<[entities]>;moving=<[moving]>;model=<[model]>;interaction=<[interaction]>;origin=<[view_origin]>;target=<[target]>;busy=true;sway_frame=1;sound_mode=<[record].get[sound_mode]||none>;sound_id=<[record].get[sound_id]||null>;sound_radius=<[record].get[sound_radius]||16>]
+  - flag <[viewer]> marallyzen_dictaphone_session:map@[session_key=<[session_key]>;dictaphone_id=<[id]>;stationary=<[stationary]>;entities=<[entities]>;moving=<[moving]>;model=<[model]>;interaction=<[interaction]>;origin=<[view_origin]>;target=<[target]>;busy=true;sway_frame=1;audio_file=<[record].get[audio_file]||unknown>;sound_mode=local;sound_id=<[record].get[sound_id]>;sound_duration=<[record].get[sound_duration]>;playback_finished=false]
   - flag <[viewer]> marallyzen_dictaphone_opening:!
   - run marallyzen_dictaphone_animate_out def:<[viewer]>
 
@@ -369,8 +404,8 @@ marallyzen_dictaphone_animate_out:
       - stop
   - flag <[viewer]> marallyzen_dictaphone_session.busy:false
   - playsound <[viewer]> sound:block_iron_trapdoor_open volume:0.28 pitch:1.65
-  - run marallyzen_dictaphone_playback_start def:<[viewer]>
   - run marallyzen_dictaphone_session_monitor def:<[viewer]>|<[session].get[session_key]>
+  - run marallyzen_dictaphone_playback_start def:<[viewer]>|<[session].get[session_key]>
 
 marallyzen_dictaphone_session_monitor:
   type: task
@@ -413,6 +448,12 @@ marallyzen_dictaphone_close:
   - define session <[viewer].flag[marallyzen_dictaphone_session]||null>
   - if <[session]> == null:
     - stop
+  - if <[session].get[closing]||false>:
+    - stop
+  # Invalidate playback/monitor queues immediately, before the return animation
+  # yields on its first wait. This prevents a late audio stage racing the close.
+  - flag <[viewer]> marallyzen_dictaphone_session.closing:true
+  - flag <[viewer]> marallyzen_dictaphone_session.session_key:<util.random_uuid>
   - flag <[viewer]> marallyzen_dictaphone_session.busy:true
   - run marallyzen_dictaphone_playback_stop def:<[viewer]>
   - define entities <[session].get[entities]>
@@ -461,17 +502,34 @@ marallyzen_dictaphone_close:
     - adjust <[viewer]> show_entity:<[stationary]>
   - flag <[viewer]> marallyzen_dictaphone_session:!
 
-# Stable extension seam for the next phase. The spawn/open/close code does not
-# need to change when sound support is enabled; only these two tasks do.
 marallyzen_dictaphone_playback_start:
   type: task
   debug: false
-  definitions: viewer
+  definitions: viewer|session_key
   script:
   - define session <[viewer].flag[marallyzen_dictaphone_session]||null>
-  - if <[session]> == null || <[session].get[sound_mode]||none> == none:
+  - if <[session]> == null || <[session].get[session_key]||null> != <[session_key]>:
     - stop
-  # Reserved for local/global playback implementation.
+  - define start_sound <script[marallyzen_dictaphone_config].data_key[start_sound]>
+  - define stop_sound <script[marallyzen_dictaphone_config].data_key[stop_sound]>
+  - define sound_id <[session].get[sound_id]>
+  # Mechanical start, selected lore recording, mechanical stop. Every wait is
+  # followed by a session-key check so cancel/movement/reload cannot revive an
+  # obsolete playback queue or close a newer dictaphone session.
+  - playsound <[viewer]> sound:<[start_sound]> custom sound_category:voice volume:1 pitch:1
+  - wait <script[marallyzen_dictaphone_config].data_key[start_duration]>
+  - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
+    - stop
+  - playsound <[viewer]> sound:<[sound_id]> custom sound_category:voice volume:1 pitch:1
+  - wait <[session].get[sound_duration]>
+  - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
+    - stop
+  - playsound <[viewer]> sound:<[stop_sound]> custom sound_category:voice volume:1 pitch:1
+  - wait <script[marallyzen_dictaphone_config].data_key[stop_duration]>
+  - if <[viewer].flag[marallyzen_dictaphone_session.session_key]||null> != <[session_key]>:
+    - stop
+  - flag <[viewer]> marallyzen_dictaphone_session.playback_finished:true
+  - run marallyzen_dictaphone_close def:<[viewer]>|true
 
 marallyzen_dictaphone_playback_stop:
   type: task
@@ -479,6 +537,10 @@ marallyzen_dictaphone_playback_stop:
   definitions: viewer
   script:
   - define session <[viewer].flag[marallyzen_dictaphone_session]||null>
-  - if <[session]> == null || <[session].get[sound_mode]||none> == none:
+  - if <[session]> == null || <[session].get[playback_finished]||false>:
     - stop
-  # Reserved for stopping looped or externally streamed playback.
+  # PlayerTag.stop_sound accepts either a category or a full namespaced key.
+  # Stop all three possible stages when a session is cancelled early.
+  - adjust <[viewer]> stop_sound:<script[marallyzen_dictaphone_config].data_key[start_sound]>
+  - adjust <[viewer]> stop_sound:<[session].get[sound_id]>
+  - adjust <[viewer]> stop_sound:<script[marallyzen_dictaphone_config].data_key[stop_sound]>
