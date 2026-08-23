@@ -21,12 +21,21 @@ marallyzen_dictaphone_config:
     05_dictaphone_prompt:
       sound_id: marallyzen:quest/test_world_quest/05_dictaphone_prompt
       duration: 75t
+      narration_speaker: Спикер
+      narration_lines:
+      - "Теперь подойди к диктофону и послушай что скажет эта алкашка."
     06_dictaphone_done_1:
       sound_id: marallyzen:quest/test_world_quest/06_dictaphone_done_1
       duration: 32t
+      narration_speaker: Спикер
+      narration_lines:
+      - "ЭТА ЧО ЗА НАХУ?!"
     07_dictaphone_done_2:
       sound_id: marallyzen:quest/test_world_quest/07_dictaphone_done_2
       duration: 27t
+      narration_speaker: Спикер
+      narration_lines:
+      - "Чувака, это жоско."
   # Five three-tick client-interpolated beats: 0.75 seconds total. This keeps
   # the motion responsive while still leaving enough frames for a cinematic
   # launch, controlled overshoot and settle.
@@ -250,12 +259,32 @@ marallyzen_dictaphone_events:
     on reload scripts:
     - foreach <server.online_players> as:viewer:
       - run marallyzen_dictaphone_close def:<[viewer]>|false
+    - run marallyzen_dictaphone_seed_narrations
     - run marallyzen_dictaphone_rebuild delay:2t
     on server start:
+    - run marallyzen_dictaphone_seed_narrations
     - run marallyzen_dictaphone_rebuild delay:2s
     on chunk loads:
     - ratelimit <context.chunk> 2s
     - run marallyzen_dictaphone_rebuild_chunk def:<context.chunk> delay:2t
+
+marallyzen_dictaphone_seed_narrations:
+  type: task
+  debug: false
+  script:
+  # One-time data migration. Afterwards admin edits live only in persistent
+  # server flags and are never overwritten by a script reload or restart.
+  - if <server.flag[marallyzen_dictaphone_narration_data_version]||0> >= 1:
+    - stop
+  - define audio_catalog <script[marallyzen_dictaphone_config].data_key[audio_files]>
+  - foreach <[audio_catalog].keys> as:audio_key:
+    - define audio_data <[audio_catalog].get[<[audio_key]>]>
+    - define lines <[audio_data].get[narration_lines]||<list[]>>
+    - if <[lines].is_empty>:
+      - foreach next
+    - flag server marallyzen_dictaphone_narrations.<[audio_key]>.lines:<[lines]>
+    - flag server marallyzen_dictaphone_narrations.<[audio_key]>.speaker:<[audio_data].get[narration_speaker]||Спикер>
+  - flag server marallyzen_dictaphone_narration_data_version:1
 
 marallyzen_dictaphone_create:
   type: task
@@ -630,7 +659,7 @@ marallyzen_dictaphone_narration:
       - if <[speaker]> == null:
         - actionbar "<gray><[line].parse_color>" targets:<[viewer]>
       - else:
-        - actionbar "<white><[speaker].parse_color><gray><&co> <[line].parse_color>" targets:<[viewer]>
+        - actionbar "<white><[speaker].parse_color> <gray>>> <[line].parse_color>" targets:<[viewer]>
       - define refresh_ticks 40
       - if <[remaining_ticks]> < <[refresh_ticks]>:
         - define refresh_ticks <[remaining_ticks]>
