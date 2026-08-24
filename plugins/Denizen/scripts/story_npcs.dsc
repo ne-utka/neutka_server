@@ -425,6 +425,12 @@ marallyzen_story_load_finish:
     - define runtime.dialogs:<[dialogs]>
     - define runtime.audio:<[audio]>
     - flag server marallyzen_story_runtime:<[runtime]>
+    # Apply presentation settings to NPCs that were already spawned.
+    - foreach <server.flag[marallyzen_story_instances].keys||<list[]>> as:story_id:
+      - define live_npc <server.flag[marallyzen_story_instances.<[story_id]>.npc]||null>
+      - define live_data <[npcs].get[<[story_id]>]||null>
+      - if <[live_npc]> != null && <[live_data]> != null && <server.npcs.contains[<[live_npc]>]>:
+        - adjust <[live_npc]> name_visible:<[live_data].get[name_visible]||false>
   - if <[actor]||null> != null:
     - define verb <tern[<[apply]> == true].pass[применена].fail[проверена]>
     - narrate "<green>Конфигурация <[verb]>. <gray>NPC: <white><[npcs].size><gray>, диалогов: <white><[dialogs].size><gray>, аудио: <white><[audio].size><gray>." targets:<[actor]>
@@ -690,22 +696,18 @@ marallyzen_story_dialog_distance_watch:
   - define outside_ticks 0
   - while <[viewer].is_online||false> && <[viewer].flag[marallyzen_story_session.key]||null> == <[session_key]>:
     - if !<[npc_entity].is_spawned||false>:
-      - run marallyzen_story_session_stop def:<[viewer]>|false|<element[<gray>Собеседник исчез. Диалог завершён.]>
+      - run marallyzen_story_session_stop def:<[viewer]>|false
       - stop
     - if <[viewer].world> != <[npc_entity].world>:
-      - run marallyzen_story_session_stop def:<[viewer]>|false|<element[<gray>Вы отошли слишком далеко. Диалог завершён.]>
+      - run marallyzen_story_session_stop def:<[viewer]>|false
       - stop
     - define distance <[viewer].location.distance[<[npc_entity].location>]>
     - if <[distance]> > <[max_distance]>:
-      - if <[outside_ticks]> == 0:
-        - actionbar "<yellow>Вы отходите слишком далеко от собеседника..." targets:<[viewer]>
       - define outside_ticks <[outside_ticks].add[<[check_ticks]>]>
       - if <[outside_ticks]> >= <[grace_ticks]>:
-        - run marallyzen_story_session_stop def:<[viewer]>|false|<element[<gray>Вы отошли дальше чем на <white><[max_distance]> <gray>блоков. Диалог завершён.]>
+        - run marallyzen_story_session_stop def:<[viewer]>|false
         - stop
     - else:
-      - if <[outside_ticks]> > 0:
-        - actionbar "" targets:<[viewer]>
       - define outside_ticks 0
     - wait <[check_rate]>
 
@@ -782,7 +784,7 @@ marallyzen_story_dialog_play_node:
 marallyzen_story_session_stop:
   type: task
   debug: false
-  definitions: viewer|notify|reason
+  definitions: viewer|notify
   script:
   - define session <[viewer].flag[marallyzen_story_session]||null>
   - if <[session]> == null:
@@ -795,7 +797,5 @@ marallyzen_story_session_stop:
     - execute as_server "minecraft:stopsound <[viewer].name> voice <[sound_id].parsed>" silent
   - flag <[viewer]> marallyzen_story_session:!
   - actionbar "" targets:<[viewer]>
-  - if <[reason]||null> != null:
-    - actionbar <[reason]> targets:<[viewer]>
-  - else if <[notify]> == true:
+  - if <[notify]> == true:
     - actionbar "<gray>Диалог остановлен." targets:<[viewer]>
