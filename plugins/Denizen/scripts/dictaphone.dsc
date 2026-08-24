@@ -60,7 +60,7 @@ marallyzen_dictaphone_command:
   aliases:
   - dict
   description: Управление серверными диктофонами Marallyzen
-  usage: /dictaphone spawn [audio_file] | narration [set|add|speaker|list|clear] [audio_file] [text] | remove | info | rebuild | cancel
+  usage: /dictaphone spawn [audio_file] | narration [set|add|speaker|list|clear] [audio_file] [text] | remove | info | rebuild | force | cancel
   permission: marallyzen.dictaphone.use
   permission message: <red>Недостаточно прав.
   tab complete:
@@ -69,7 +69,7 @@ marallyzen_dictaphone_command:
     - define admin <player.is_op.or[<player.has_permission[marallyzen.dictaphone.admin]>]>
   - if <context.args.size> <= 1:
     - if <[admin]>:
-      - determine spawn|narration|remove|info|rebuild|cancel
+      - determine spawn|narration|remove|info|rebuild|force|cancel
     - determine info|cancel
   - if <context.args.size> == 2 && <context.args.get[1].to_lowercase||null> == spawn && <[admin]>:
     - determine <script[marallyzen_dictaphone_config].data_key[audio_files].keys>
@@ -204,11 +204,14 @@ marallyzen_dictaphone_command:
     - case rebuild:
       - run marallyzen_dictaphone_rebuild
       - narrate "<green>Проверка и восстановление диктофонов запущены."
+    - case force:
+      - run marallyzen_dictaphone_force_reset
+      - narrate "<green>Все активные диктофоны принудительно возвращены на блоки."
     - default:
       - narrate "<gold>/dictaphone spawn <white>[audio_file] <gray>— поставить диктофон с выбранной записью"
       - narrate "<gold>/dictaphone narration <white>[set|add|speaker|list|clear] [audio_file] <gray>— настроить наррацию"
       - narrate "<gold>/dictaphone remove <gray>— удалить диктофон, на который вы смотрите"
-      - narrate "<gold>/dictaphone info | rebuild | cancel"
+      - narrate "<gold>/dictaphone info | rebuild | force | cancel"
 
 marallyzen_dictaphone_events:
   type: world
@@ -380,6 +383,34 @@ marallyzen_dictaphone_rebuild:
       - run marallyzen_dictaphone_remove def:<[id]>|null
     - else:
       - run marallyzen_dictaphone_spawn_stationary def:<[id]>
+
+marallyzen_dictaphone_force_reset:
+  type: task
+  debug: false
+  script:
+  - foreach <server.online_players> as:viewer:
+    - define session <[viewer].flag[marallyzen_dictaphone_session]||null>
+    - if <[session]> != null:
+      # Change the key before stopping audio so playback and narration queues
+      # cannot resume after their next wait.
+      - flag <[viewer]> marallyzen_dictaphone_session.session_key:<util.random_uuid>
+      - run marallyzen_dictaphone_playback_stop def:<[viewer]>
+      - foreach <[session].get[entities]||<list[]>> as:entity:
+        - if <[entity].is_spawned||false>:
+          - remove <[entity]>
+      - define stationary <[session].get[stationary]||null>
+      - if <[stationary]> != null && <[stationary].is_spawned||false>:
+        - adjust <[viewer]> show_entity:<[stationary]>
+      - actionbar "" targets:<[viewer]>
+    - flag <[viewer]> marallyzen_dictaphone_session:!
+    - flag <[viewer]> marallyzen_dictaphone_opening:!
+
+  - foreach <server.worlds> as:world:
+    - foreach <[world].entities[item_display|interaction]> as:entity:
+      - if <list[session_model|session_interaction].contains[<[entity].flag[dictaphone_role]||null>]>:
+        - remove <[entity]>
+  - flag server marallyzen_dictaphone_spawning:!
+  - run marallyzen_dictaphone_rebuild
 
 marallyzen_dictaphone_rebuild_chunk:
   type: task

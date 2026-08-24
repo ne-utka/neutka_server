@@ -171,7 +171,7 @@ marallyzen_poster_command:
   debug: false
   name: poster
   description: Управление плакатами Marallyzen
-  usage: /poster spawn [asset_name] | give [type] [player] | info | remove | variant [default/alive/dead/band] | rebuild | cancel
+  usage: /poster spawn [asset_name] | give [type] [player] | info | remove | variant [default/alive/dead/band] | rebuild | force | cancel
   permission: marallyzen.poster.use
   permission message: <red>Недостаточно прав.
   tab complete:
@@ -181,7 +181,7 @@ marallyzen_poster_command:
   - define argument <context.args.size>
   - if <[argument]> <= 1:
     - if <[admin]>:
-      - determine spawn|give|info|remove|variant|rebuild|cancel
+      - determine spawn|give|info|remove|variant|rebuild|force|cancel
     - determine info|cancel
   - if !<[admin]>:
     - determine <list[]>
@@ -289,10 +289,13 @@ marallyzen_poster_command:
     - case rebuild:
       - run marallyzen_poster_rebuild
       - narrate "<green>Проверка и восстановление плакатов запущены."
+    - case force:
+      - run marallyzen_poster_force_reset
+      - narrate "<green>Все активные плакаты принудительно возвращены на стены."
     - default:
       - narrate "<gold>/poster spawn [asset_name] <gray>— поставить ассет из ресурспака"
       - narrate "<gold>/poster give [type] [player]"
-      - narrate "<gold>/poster info | remove | variant [default/alive/dead/band] | rebuild | cancel"
+      - narrate "<gold>/poster info | remove | variant [default/alive/dead/band] | rebuild | force | cancel"
 
 marallyzen_poster_events:
   type: world
@@ -495,6 +498,35 @@ marallyzen_poster_rebuild:
     - else:
       # A manual/global rebuild also migrates model geometry and wall offsets.
       - run marallyzen_poster_spawn_stationary def:<[id]>
+
+marallyzen_poster_force_reset:
+  type: task
+  debug: false
+  script:
+  # Invalidate every player-owned animation queue without yielding for the
+  # normal return flight. This also bypasses sessions stuck in a busy state.
+  - foreach <server.online_players> as:viewer:
+    - define session <[viewer].flag[marallyzen_poster_session]||null>
+    - if <[session]> != null:
+      - foreach <[session].get[entities]||<list[]>> as:entity:
+        - if <[entity].is_spawned||false>:
+          - remove <[entity]>
+      - define stationary <[session].get[stationary]||null>
+      - if <[stationary]> != null && <[stationary].is_spawned||false>:
+        - adjust <[viewer]> show_entity:<[stationary]>
+    - flag <[viewer]> marallyzen_poster_session:!
+    - flag <[viewer]> marallyzen_poster_opening:!
+
+  # Recover temporary entities whose owner flag or queue was lost. WorldTag's
+  # entity list spans every currently loaded chunk in every loaded world.
+  - foreach <server.worlds> as:world:
+    - foreach <[world].entities[item_display|interaction]> as:entity:
+      - if <list[session_model|session_interaction].contains[<[entity].flag[poster_role]||null>]>:
+        - remove <[entity]>
+  - flag server marallyzen_poster_spawning:!
+  # Recreate every loaded stationary model. Unloaded records are restored by
+  # the existing chunk-load handler when their world area becomes active.
+  - run marallyzen_poster_rebuild
 
 marallyzen_poster_rebuild_chunk:
   type: task
