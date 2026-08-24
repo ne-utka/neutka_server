@@ -83,9 +83,9 @@ marallyzen_anvil_visual_update:
     - stop
 
   # An anvil is rectangular, so its input row belongs to the block rather
-  # than to the user. The facing determines its long axis: north/south uses
-  # the X axis and east/west uses the Z axis. Approaching from another side
-  # must never rotate or rearrange the public display.
+  # than to the user. Its facing follows the long axis: north/south uses Z
+  # and east/west uses X. Approaching from another side must never rotate or
+  # rearrange the public display.
   - define side <[anvil].material.direction.to_lowercase>
 
   # Anvil slots 1 and 2 are inputs. Slot 3 is the result and is ignored.
@@ -118,14 +118,14 @@ marallyzen_anvil_visual_update:
     - define offset <script[marallyzen_anvil_visual_config].data_key[slot_offset]>
     - if <[slot]> == 1:
       - define offset <[offset].mul[-1]>
-    - define item_offset <location[<[offset]>,0,0]>
+    - define item_offset <location[0,0,<[offset]>]>
     - choose <[side]>:
       - case east:
-        - define item_offset <[item_offset].rotate_around_y[1.570796327]>
+        - define item_offset <location[<[offset]>,0,0]>
       - case west:
-        - define item_offset <[item_offset].rotate_around_y[-1.570796327]>
+        - define item_offset <location[-<[offset]>,0,0]>
       - case north:
-        - define item_offset <[item_offset].rotate_around_y[3.141592654]>
+        - define item_offset <location[0,0,-<[offset]>]>
     - define position <[anvil].center.add[<[item_offset]>].add[0,<script[marallyzen_anvil_visual_config].data_key[surface_height]>,0]>
     - define scale <script[marallyzen_anvil_visual_config].data_key[item_scale]>
     - spawn item_display[item=<[shown_item]>;display=fixed;pivot=fixed;scale=<[scale]>,<[scale]>,<[scale]>;interpolation_duration=2t;teleport_duration=0t;view_range=16;shadow_radius=0] <[position]> save:anvil_item
