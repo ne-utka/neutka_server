@@ -2,7 +2,7 @@ id: merchant
 name: Торговец
 dialog: merchant_dialog
 entity_type: villager
-name_visible: true
+name_visible: false
 look_at_player: true
 look_range: 7
 dialog_range: 6
