@@ -14,7 +14,7 @@
 
 Декоративные россыпи выглядят как выброшенные предметы, но их нельзя подобрать или сдвинуть блоком. Они сохраняются после перезапуска сервера и исчезают только по команде администратора.
 
-<figure><img src="../.gitbook/assets/fantomitems.gif" alt=""><figcaption></figcaption></figure>
+<figure><img src="../.gitbook/assets/javaw_KWEENcX30N-_online-video-cutter.com_-_1_.gif" alt=""><figcaption></figcaption></figure>
 
 ## Ремонт наковален
 
