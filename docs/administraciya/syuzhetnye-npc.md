@@ -33,6 +33,7 @@ ID разрешено составлять из строчных латинск�
 id: bartender
 name: Бармен
 dialog: bartender_intro
+entity_type: player
 name_visible: false
 look_at_player: true
 look_range: 6
@@ -42,6 +43,8 @@ skin:
   value: bartender.png
   model: slim
 ```
+
+`entity_type` принимает `player` или `villager`. Тип `player` нужен для обычных и slim-скинов. Для деревенского NPC укажите `villager` и `skin.type: none`; такой NPC также не попадает в обработку fake-player плагинов вроде Emotecraft.
 
 Варианты `skin.type`:
 

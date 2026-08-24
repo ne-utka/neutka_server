@@ -316,6 +316,7 @@ marallyzen_story_load:
     - define file_id <yaml[<[yaml_id]>].read[id]||null>
     - define name <yaml[<[yaml_id]>].read[name]||null>
     - define dialog_id <yaml[<[yaml_id]>].read[dialog]||null>
+    - define entity_type <yaml[<[yaml_id]>].read[entity_type]||player>
     - define skin_type <yaml[<[yaml_id]>].read[skin.type]||none>
     - define skin_value <yaml[<[yaml_id]>].read[skin.value]||null>
     - define skin_model <yaml[<[yaml_id]>].read[skin.model]||classic>
@@ -325,6 +326,10 @@ marallyzen_story_load:
       - define errors:->:<element[NPC <[story_id]>: отсутствует name.]>
     - if <[dialog_id]> == null || !<[dialogs].contains[<[dialog_id]>]>:
       - define errors:->:<element[NPC <[story_id]>: неизвестный dialog '<[dialog_id]>'.]>
+    - if !<list[player|villager].contains[<[entity_type]>]>:
+      - define errors:->:<element[NPC <[story_id]>: entity_type должен быть player или villager.]>
+    - if <[entity_type]> != player && <[skin_type]> != none:
+      - define errors:->:<element[NPC <[story_id]>: скин доступен только при entity_type player.]>
     - if !<list[none|player|file|blob].contains[<[skin_type]>]>:
       - define errors:->:<element[NPC <[story_id]>: skin.type должен быть none, player, file или blob.]>
     - if <[skin_type]> != none && <[skin_value]> == null:
@@ -344,6 +349,7 @@ marallyzen_story_load:
     - define entry.id:<[story_id]>
     - define entry.name:<[name]>
     - define entry.dialog:<[dialog_id]>
+    - define entry.entity_type:<[entity_type]>
     - define entry.skin:<[skin]>
     - define entry.name_visible:<yaml[<[yaml_id]>].read[name_visible]||false>
     - define entry.look_at_player:<yaml[<[yaml_id]>].read[look_at_player]||true>
@@ -390,18 +396,19 @@ marallyzen_story_npc_spawn:
     - narrate "<yellow>NPC <[story_id]> уже создан. Сначала используйте remove." targets:<[actor]>
     - stop
   - define location <[actor].location.forward_flat[2].with_yaw[<[actor].location.yaw.add[180]>]>
-  - create player <[npc_data].get[name]> <[location]> save:story_created
+  - define entity_type <[npc_data].get[entity_type]||player>
+  - create <[entity_type]> <[npc_data].get[name]> <[location]> save:story_created
   - define created <entry[story_created].created_npc>
   - flag <[created]> marallyzen_story_id:<[story_id]>
   - flag <[created]> marallyzen_story_dialog:<[npc_data].get[dialog]>
   - adjust <[created]> name_visible:<[npc_data].get[name_visible]||false>
   - define skin <[npc_data].get[skin]>
   - define skin_type <[skin].get[type]||none>
-  - if <[skin_type]> == player:
+  - if <[entity_type]> == player && <[skin_type]> == player:
     - adjust <[created]> skin:<[skin].get[value]>
-  - else if <[skin_type]> == blob:
+  - else if <[entity_type]> == player && <[skin_type]> == blob:
     - adjust <[created]> skin_blob:<[skin].get[value]>
-  - else if <[skin_type]> == file:
+  - else if <[entity_type]> == player && <[skin_type]> == file:
     - execute as_server "npc select <[created].id>" silent
     - define slim_flag ""
     - if <[skin].get[model]||classic> == slim:
@@ -439,6 +446,7 @@ marallyzen_story_npc_info:
   - define created <server.flag[marallyzen_story_instances.<[story_id]>.npc]||null>
   - narrate "<gold>ID<&co> <white><[story_id]>" targets:<[actor]>
   - narrate "<gold>Имя<&co> <white><[npc_data].get[name]>" targets:<[actor]>
+  - narrate "<gold>Тип сущности<&co> <white><[npc_data].get[entity_type]||player>" targets:<[actor]>
   - narrate "<gold>Диалог<&co> <white><[npc_data].get[dialog]>" targets:<[actor]>
   - narrate "<gold>Скин<&co> <white><[npc_data].get[skin].get[type]> / <[npc_data].get[skin].get[model]>" targets:<[actor]>
   - if <[created]> != null && <server.npcs.contains[<[created]>]>:
@@ -530,7 +538,7 @@ marallyzen_story_dialog_play_node:
     - actionbar "<gray>Выберите ответ в чате." targets:<[viewer]>
     - narrate "<gray>Выберите ответ<&co>" targets:<[viewer]>
     - foreach <[choices]> key:choice_id as:choice:
-      - define button <element[  <gray>[<white><[loop_index]><gray>] <white><[choice].get[text].parse_color>].on_click[/storychoice <[session_key]> <[choice_id]>].on_hover[<&gray>Нажмите, чтобы ответить]>
+      - define button <element[  <gray>[<white><[loop_index]><gray>] <white><[choice].get[text].parse_color>].on_click[/storychoice <[session_key]> <[choice_id]>].on_hover[<gray>Нажмите, чтобы ответить]>
       - narrate <[button]> targets:<[viewer]>
     - stop
   - define next <[node].get[next]||end>
