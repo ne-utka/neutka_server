@@ -492,16 +492,34 @@ marallyzen_story_choice_ui_show:
     - define base <[anchor].add[<[side_vector].mul[1.65]>]>
   - else:
     - define base <[viewer].eye_location.forward[3].add[0,0.5,0]>
+    - define facing <[base].face[<[viewer].eye_location>]>
+    - define side_point <[facing].with_yaw[<[facing].yaw.sub[90]>].forward_flat[1]>
+    - define side_vector <[side_point].sub[<[base]>]>
+  # A TextDisplay's alignment does not move its centered transform origin.
+  # Keep the group centered, then offset every line by half its pixel width so
+  # all visible left edges share the same world-space anchor.
+  - define half_pixel_scale 0.009
+  - define max_text_width 0
+  - foreach <[choices]> as:choice:
+    - define measure_label <[choice].get[text].parse_color.strip_color>
+    - define measure_text <element[<[loop_index]>. <[measure_label]>]>
+    - define measure_width <[measure_text].text_width>
+    - if <[measure_width]> > <[max_text_width]>:
+      - define max_text_width <[measure_width]>
+  - define left_origin <[base].add[<[side_vector].mul[<[max_text_width].mul[<[half_pixel_scale]>].mul[-1]>]>]>
   - define ui_entities <list[]>
   - define interactions <list[]>
   - foreach <[choices]> key:choice_id as:choice:
     - define index <[loop_index]>
-    - define label <[choice].get[text].parse_color>
+    - define label <[choice].get[text].parse_color.strip_color>
     - define y_offset <[index].sub[1].mul[-0.34]>
-    - define line_location <[base].add[0,<[y_offset]>,0]>
-    - spawn text_display <[line_location]> save:story_choice_text
+    - define line_origin <[left_origin].add[0,<[y_offset]>,0]>
+    - define normal_text <element[<[index]>. <[label]>]>
+    - define center_offset <[normal_text].text_width.mul[<[half_pixel_scale]>]>
+    - define display_location <[line_origin].add[<[side_vector].mul[<[center_offset]>]>]>
+    - spawn text_display <[display_location]> save:story_choice_text
     - define display <entry[story_choice_text].spawned_entity>
-    - adjust <[display]> text:<element[<[index]>. <[label]>].color[white]>
+    - adjust <[display]> text:<[normal_text].color[white]>
     - adjust <[display]> pivot:center
     - adjust <[display]> display:left
     - adjust <[display]> line_width:1000
@@ -510,8 +528,8 @@ marallyzen_story_choice_ui_show:
     - adjust <[display]> text_shadowed:true
     - adjust <[display]> opacity:255
     - adjust <[display]> see_through:false
-    - adjust <[display]> scale:<location[0.9,0.9,0.9]>
-    - spawn interaction[width=3.4;height=0.34;is_aware=true] <[line_location].add[0,-0.17,0]> save:story_choice_hitbox
+    - adjust <[display]> scale:<location[0.72,0.72,0.72]>
+    - spawn interaction[width=3.4;height=0.34;is_aware=true] <[base].add[0,<[y_offset].sub[0.17]>,0]> save:story_choice_hitbox
     - define hitbox <entry[story_choice_hitbox].spawned_entity>
     - flag <[display]> marallyzen_story_choice_ui:true
     - flag <[hitbox]> marallyzen_story_choice_ui:true
@@ -521,6 +539,8 @@ marallyzen_story_choice_ui_show:
     - flag <[hitbox]> marallyzen_story_choice_index:<[index]>
     - flag <[hitbox]> marallyzen_story_choice_label:<[label]>
     - flag <[hitbox]> marallyzen_story_choice_display:<[display]>
+    - flag <[hitbox]> marallyzen_story_choice_origin:<[line_origin]>
+    - flag <[hitbox]> marallyzen_story_choice_side:<[side_vector]>
     - adjust <[display]> hide_from_players
     - adjust <[hitbox]> hide_from_players
     - adjust <[viewer]> show_entity:<[display]>
@@ -549,14 +569,22 @@ marallyzen_story_choice_ui_watch:
       - if <[previous]> != null && <[previous].is_spawned||false>:
         - define old_display <[previous].flag[marallyzen_story_choice_display]||null>
         - if <[old_display]> != null && <[old_display].is_spawned||false>:
-          - adjust <[old_display]> text:<element[<[previous].flag[marallyzen_story_choice_index]>. <[previous].flag[marallyzen_story_choice_label]>].color[white]>
+          - define old_text <element[<[previous].flag[marallyzen_story_choice_index]>. <[previous].flag[marallyzen_story_choice_label]>]>
+          - define old_offset <[old_text].text_width.mul[0.009]>
+          - define old_location <[previous].flag[marallyzen_story_choice_origin].add[<[previous].flag[marallyzen_story_choice_side].mul[<[old_offset]>]>]>
+          - teleport <[old_display]> <[old_location]>
+          - adjust <[old_display]> text:<[old_text].color[white]>
           - adjust <[old_display]> background_color:<color[transparent]>
           - adjust <[old_display]> text_shadowed:true
       - if <[hovered]> != null && <[hovered].is_spawned||false>:
         - define new_display <[hovered].flag[marallyzen_story_choice_display]||null>
         - if <[new_display]> != null && <[new_display].is_spawned||false>:
           - define selected_label <[hovered].flag[marallyzen_story_choice_label].strip_color>
-          - adjust <[new_display]> text:<element[◀ <[selected_label]>].color[#1A1408]>
+          - define selected_text <element[◀ <[selected_label]>]>
+          - define selected_offset <[selected_text].text_width.mul[0.009]>
+          - define selected_location <[hovered].flag[marallyzen_story_choice_origin].add[<[hovered].flag[marallyzen_story_choice_side].mul[<[selected_offset]>]>]>
+          - teleport <[new_display]> <[selected_location]>
+          - adjust <[new_display]> text:<[selected_text].color[#1A1408]>
           - adjust <[new_display]> background_color:<color[#F2B63DFF]>
           - adjust <[new_display]> text_shadowed:false
       - flag <[viewer]> marallyzen_story_session.highlighted_choice:<[hovered]>
