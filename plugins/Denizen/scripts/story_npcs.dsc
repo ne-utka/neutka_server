@@ -111,6 +111,45 @@ marallyzen_story_command:
       - narrate "<gold>/story dialog play <white>[dialog_id] [player]"
       - narrate "<gold>/story stop <white>[player]"
 
+# Public command used only by the clickable answer components. The random
+# session key and current-node check make copied or stale buttons harmless.
+marallyzen_story_choice_command:
+  type: command
+  debug: false
+  name: storychoice
+  description: Выбор ответа в сюжетном диалоге
+  usage: /storychoice
+  permission: marallyzen.story.use
+  permission message: <red>Недостаточно прав.
+  tab complete:
+  - determine <list[]>
+  script:
+  - if <context.server>:
+    - stop
+  - define session_key <context.args.get[1]||null>
+  - define choice_id <context.args.get[2].to_lowercase||null>
+  - define session <player.flag[marallyzen_story_session]||null>
+  - if <[session]> == null || <[session].get[key]> != <[session_key]> || <[session].get[awaiting_choice]||false> != true:
+    - stop
+  - define dialog_id <[session].get[dialog]>
+  - define node_id <[session].get[node]>
+  - define choice <server.flag[marallyzen_story_runtime.dialogs.<[dialog_id]>.nodes.<[node_id]>.choices.<[choice_id]>]||null>
+  - if <[choice]> == null:
+    - stop
+  - ratelimit <player> 3t
+  - flag player marallyzen_story_session.awaiting_choice:false
+  - flag player marallyzen_story_session.available_choices:!
+  - actionbar "<gray>Вы<&co> <white><[choice].get[text].parse_color>" targets:<player>
+  - wait 10t
+  - if <player.flag[marallyzen_story_session.key]||null> != <[session_key]>:
+    - stop
+  - define next <[choice].get[next]||end>
+  - if <[next]> == end:
+    - actionbar "" targets:<player>
+    - flag player marallyzen_story_session:!
+    - stop
+  - run marallyzen_story_dialog_play_node def:<player>|<[session_key]>|<[dialog_id]>|<[next]>|<[session].get[default_speaker]||Персонаж>
+
 marallyzen_story_events:
   type: world
   debug: false
@@ -201,23 +240,66 @@ marallyzen_story_load:
     - ~yaml load:story/<[path]> id:<[yaml_id]>
     - define loaded_yaml:->:<[yaml_id]>
     - define file_id <yaml[<[yaml_id]>].read[id]||null>
-    - define lines <yaml[<[yaml_id]>].read[lines]||<list[]>>
     - if <[file_id]> != <[dialog_id]>:
       - define errors:->:<element[Диалог <[dialog_id]>: поле id равно '<[file_id]>'.]>
-    - if <[lines].is_empty>:
-      - define errors:->:<element[Диалог <[dialog_id]>: список lines пуст.]>
-    - foreach <[lines]> as:node:
-      - if <[node].get[pause]||null> != null:
-        - foreach next
-      - define node_audio <[node].get[audio]||null>
-      - define node_text <[node].get[text]||null>
-      - if <[node_audio]> == null && <[node_text]> == null:
-        - define errors:->:<element[Диалог <[dialog_id]>, строка <[loop_index]>: нужны audio, text или pause.]>
-      - if <[node_audio]> != null && !<[audio].contains[<[node_audio]>]>:
-        - define errors:->:<element[Диалог <[dialog_id]>, строка <[loop_index]>: неизвестное аудио <[node_audio]>.]>
+    - define node_keys <yaml[<[yaml_id]>].list_keys[nodes]||<list[]>>
+    - define nodes <map[]>
+    # Legacy linear files remain valid and become a single "start" node.
+    - if <[node_keys].is_empty>:
+      - define legacy_lines <yaml[<[yaml_id]>].read[lines]||<list[]>>
+      - define node_keys <list[start]>
+      - define legacy_node <map[]>
+      - define legacy_node.lines:<[legacy_lines]>
+      - define legacy_node.choices:<map[]>
+      - define nodes.start:<[legacy_node]>
+      - define start_node start
+    - else:
+      - define start_node <yaml[<[yaml_id]>].read[start]||<[node_keys].first>>
+      - foreach <[node_keys]> as:node_id:
+        - if !<[node_id].regex_matches[^[a-z0-9_-]+$]>:
+          - define errors:->:<element[Диалог <[dialog_id]>: некорректный ID узла <[node_id]>.]>
+        - define node_lines <yaml[<[yaml_id]>].read[nodes.<[node_id]>.lines]||<list[]>>
+        - define node_next <yaml[<[yaml_id]>].read[nodes.<[node_id]>.next]||null>
+        - define choices <map[]>
+        - foreach <yaml[<[yaml_id]>].list_keys[nodes.<[node_id]>.choices]||<list[]>> as:choice_id:
+          - define choice_text <yaml[<[yaml_id]>].read[nodes.<[node_id]>.choices.<[choice_id]>.text]||null>
+          - define choice_next <yaml[<[yaml_id]>].read[nodes.<[node_id]>.choices.<[choice_id]>.next]||null>
+          - if !<[choice_id].regex_matches[^[a-z0-9_-]+$]>:
+            - define errors:->:<element[Диалог <[dialog_id]>, узел <[node_id]>: некорректный выбор <[choice_id]>.]>
+          - if <[choice_text]> == null || <[choice_next]> == null:
+            - define errors:->:<element[Диалог <[dialog_id]>, выбор <[choice_id]>: нужны text и next.]>
+          - if <[choice_next]> != end && !<[node_keys].contains[<[choice_next]>]>:
+            - define errors:->:<element[Диалог <[dialog_id]>, выбор <[choice_id]>: неизвестный узел <[choice_next]>.]>
+          - define choice <map[]>
+          - define choice.text:<[choice_text]>
+          - define choice.next:<[choice_next]>
+          - define choices.<[choice_id]>:<[choice]>
+        - if <[node_next]> != null && <[node_next]> != end && !<[node_keys].contains[<[node_next]>]>:
+          - define errors:->:<element[Диалог <[dialog_id]>, узел <[node_id]>: неизвестный next <[node_next]>.]>
+        - define node <map[]>
+        - define node.lines:<[node_lines]>
+        - define node.next:<[node_next]>
+        - define node.choices:<[choices]>
+        - define nodes.<[node_id]>:<[node]>
+    - if !<[node_keys].contains[<[start_node]>]>:
+      - define errors:->:<element[Диалог <[dialog_id]>: неизвестный стартовый узел <[start_node]>.]>
+    - foreach <[nodes]> key:node_id as:node:
+      - define node_lines <[node].get[lines]||<list[]>>
+      - if <[node_lines].is_empty> && <[node].get[choices].is_empty||true>:
+        - define errors:->:<element[Диалог <[dialog_id]>, узел <[node_id]>: нет реплик или вариантов ответа.]>
+      - foreach <[node_lines]> as:line_data:
+        - if <[line_data].get[pause]||null> != null:
+          - foreach next
+        - define node_audio <[line_data].get[audio]||null>
+        - define node_text <[line_data].get[text]||null>
+        - if <[node_audio]> == null && <[node_text]> == null:
+          - define errors:->:<element[Диалог <[dialog_id]>, узел <[node_id]>, строка <[loop_index]>: нужны audio, text или pause.]>
+        - if <[node_audio]> != null && !<[audio].contains[<[node_audio]>]>:
+          - define errors:->:<element[Диалог <[dialog_id]>, узел <[node_id]>: неизвестное аудио <[node_audio]>.]>
     - define entry <map[]>
     - define entry.id:<[dialog_id]>
-    - define entry.lines:<[lines]>
+    - define entry.start:<[start_node]>
+    - define entry.nodes:<[nodes]>
     - define dialogs.<[dialog_id]>:<[entry]>
 
   - foreach <yaml[mlz_story_stage_manifest].list_keys[npcs]||<list[]>> as:story_id:
@@ -384,26 +466,43 @@ marallyzen_story_dialog_start:
   - if <[npc_entity]> != null:
     - define npc_story_id <[npc_entity].flag[marallyzen_story_id]||null>
     - define npc_name <server.flag[marallyzen_story_runtime.npcs.<[npc_story_id]>.name]||Персонаж>
-  - flag <[viewer]> marallyzen_story_session:map@[key=<[session_key]>;dialog=<[dialog_id]>;npc=<[npc_entity]>;active_sound=null]
-  - run marallyzen_story_dialog_play def:<[viewer]>|<[session_key]>|<[dialog_id]>|<[npc_name]>
+  - define start_node <[dialog].get[start]||start>
+  - flag <[viewer]> marallyzen_story_session:map@[key=<[session_key]>;dialog=<[dialog_id]>;node=<[start_node]>;npc=<[npc_entity]>;default_speaker=<[npc_name]>;active_sound=null;awaiting_choice=false;transitions=0]
+  - run marallyzen_story_dialog_play_node def:<[viewer]>|<[session_key]>|<[dialog_id]>|<[start_node]>|<[npc_name]>
 
-marallyzen_story_dialog_play:
+marallyzen_story_dialog_play_node:
   type: task
   debug: false
-  definitions: viewer|session_key|dialog_id|default_speaker
+  definitions: viewer|session_key|dialog_id|node_id|default_speaker
   script:
-  - define lines <server.flag[marallyzen_story_runtime.dialogs.<[dialog_id]>.lines]||<list[]>>
-  - foreach <[lines]> as:node:
+  - if <[viewer].flag[marallyzen_story_session.key]||null> != <[session_key]>:
+    - stop
+  - define node <server.flag[marallyzen_story_runtime.dialogs.<[dialog_id]>.nodes.<[node_id]>]||null>
+  - if <[node]> == null:
+    - actionbar "<red>Ветка диалога повреждена." targets:<[viewer]>
+    - flag <[viewer]> marallyzen_story_session:!
+    - stop
+  - define transitions <[viewer].flag[marallyzen_story_session.transitions]||0>
+  - define transitions <[transitions].add[1]>
+  - if <[transitions]> > 64:
+    - actionbar "<red>Диалог остановлен: слишком много автоматических переходов." targets:<[viewer]>
+    - flag <[viewer]> marallyzen_story_session:!
+    - stop
+  - flag <[viewer]> marallyzen_story_session.node:<[node_id]>
+  - flag <[viewer]> marallyzen_story_session.transitions:<[transitions]>
+  - flag <[viewer]> marallyzen_story_session.awaiting_choice:false
+  - define lines <[node].get[lines]||<list[]>>
+  - foreach <[lines]> as:line_data:
     - if <[viewer].flag[marallyzen_story_session.key]||null> != <[session_key]>:
       - stop
-    - define pause <[node].get[pause]||null>
+    - define pause <[line_data].get[pause]||null>
     - if <[pause]> != null:
       - wait <[pause].as[duration]>
       - foreach next
-    - define audio_id <[node].get[audio]||null>
-    - define text <[node].get[text]||null>
-    - define speaker <[node].get[speaker]||<[default_speaker]>>
-    - define duration <[node].get[duration]||40t>
+    - define audio_id <[line_data].get[audio]||null>
+    - define text <[line_data].get[text]||null>
+    - define speaker <[line_data].get[speaker]||<[default_speaker]>>
+    - define duration <[line_data].get[duration]||40t>
     - if <[audio_id]> != null:
       - define audio <server.flag[marallyzen_story_runtime.audio.<[audio_id]>]>
       - define sound_id <[audio].get[sound_id]>
@@ -422,9 +521,24 @@ marallyzen_story_dialog_play:
       - wait <[step]>t
       - define remaining <[remaining].sub[<[step]>]>
     - flag <[viewer]> marallyzen_story_session.active_sound:null
-  - if <[viewer].flag[marallyzen_story_session.key]||null> == <[session_key]>:
-    - actionbar "" targets:<[viewer]>
-    - flag <[viewer]> marallyzen_story_session:!
+  - if <[viewer].flag[marallyzen_story_session.key]||null> != <[session_key]>:
+    - stop
+  - define choices <[node].get[choices]||<map[]>>
+  - if !<[choices].is_empty>:
+    - flag <[viewer]> marallyzen_story_session.awaiting_choice:true
+    - flag <[viewer]> marallyzen_story_session.available_choices:<[choices].keys>
+    - actionbar "<gray>Выберите ответ в чате." targets:<[viewer]>
+    - narrate "<gray>Выберите ответ<&co>" targets:<[viewer]>
+    - foreach <[choices]> key:choice_id as:choice:
+      - define button <element[  <gray>[<white><[loop_index]><gray>] <white><[choice].get[text].parse_color>].on_click[/storychoice <[session_key]> <[choice_id]>].on_hover[<&gray>Нажмите, чтобы ответить]>
+      - narrate <[button]> targets:<[viewer]>
+    - stop
+  - define next <[node].get[next]||end>
+  - if <[next]> != end:
+    - run marallyzen_story_dialog_play_node def:<[viewer]>|<[session_key]>|<[dialog_id]>|<[next]>|<[default_speaker]>
+    - stop
+  - actionbar "" targets:<[viewer]>
+  - flag <[viewer]> marallyzen_story_session:!
 
 marallyzen_story_session_stop:
   type: task
