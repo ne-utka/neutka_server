@@ -1,0 +1,11 @@
+# Resource-pack audio registry. Durations are exact Denizen durations.
+audio:
+  05_dictaphone_prompt:
+    sound_id: marallyzen:quest/test_world_quest/05_dictaphone_prompt
+    duration: 75t
+  06_dictaphone_done_1:
+    sound_id: marallyzen:quest/test_world_quest/06_dictaphone_done_1
+    duration: 32t
+  07_dictaphone_done_2:
+    sound_id: marallyzen:quest/test_world_quest/07_dictaphone_done_2
+    duration: 27t

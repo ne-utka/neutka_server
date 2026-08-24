@@ -1,0 +1,14 @@
+id: demo_speaker
+name: Спикер
+dialog: demo_intro
+name_visible: false
+look_at_player: true
+look_range: 6
+
+# type: player uses a Minecraft account skin and detects its model automatically.
+# type: file reads story/skins/<value>; model may be classic or slim.
+# type: blob accepts a cached Citizens/Denizen texture;signature;name blob.
+skin:
+  type: player
+  value: neutko
+  model: auto

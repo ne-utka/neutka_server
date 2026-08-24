@@ -99,3 +99,20 @@
 ```
 
 Право: `marallyzen.cutscene.admin`.
+
+## Сюжетные NPC
+
+```text
+/story validate
+/story reload
+/story npc spawn <id>
+/story npc remove <id>
+/story npc info <id>
+/story npc list
+/story dialog play <dialog_id> [player]
+/story stop [player]
+```
+
+`validate` проверяет YAML без применения, а `reload` атомарно заменяет рабочий реестр только при отсутствии ошибок. Подробности находятся на странице [«Сюжетные NPC и диалоги»](syuzhetnye-npc.md).
+
+Права: разговоры — `marallyzen.story.use`, управление — `marallyzen.story.admin`.

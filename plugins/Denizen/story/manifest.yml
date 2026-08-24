@@ -1,0 +1,10 @@
+version: 1
+
+# IDs stay stable forever. File names may change without breaking placed NPCs.
+npcs:
+  demo_speaker: npcs/demo_speaker.yml
+
+dialogs:
+  demo_intro: dialogs/demo_intro.yml
+
+audio: audio.yml

@@ -10,10 +10,12 @@ marallyzen_luckperms_events:
     - run marallyzen_luckperms_bootstrap delay:10s
     - run marallyzen_luckperms_bootstrap_v2 delay:12s
     - run marallyzen_luckperms_bootstrap_v3 delay:14s
+    - run marallyzen_luckperms_bootstrap_v4 delay:16s
 
     on reload scripts:
     - run marallyzen_luckperms_bootstrap_v2 delay:2s
     - run marallyzen_luckperms_bootstrap_v3 delay:3s
+    - run marallyzen_luckperms_bootstrap_v4 delay:4s
 
 marallyzen_luckperms_bootstrap:
   type: task
@@ -70,3 +72,13 @@ marallyzen_luckperms_bootstrap_v3:
   # content placement tools this remains restricted to the admin chain.
   - execute as_server "lp group admin permission set marallyzen.cutscene.admin true" silent
   - flag server marallyzen_luckperms_bootstrap_v3:true
+
+marallyzen_luckperms_bootstrap_v4:
+  type: task
+  debug: false
+  script:
+  - if <server.has_flag[marallyzen_luckperms_bootstrap_v4]>:
+    - stop
+  - execute as_server "lp group default permission set marallyzen.story.use true" silent
+  - execute as_server "lp group admin permission set marallyzen.story.admin true" silent
+  - flag server marallyzen_luckperms_bootstrap_v4:true

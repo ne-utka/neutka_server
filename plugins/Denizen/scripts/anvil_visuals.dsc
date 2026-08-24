@@ -16,9 +16,14 @@ marallyzen_anvil_visual_events:
   events:
     # Remember the physical block because InventoryOpenEvent does not expose a
     # dependable location for every server build and opening route.
-    on player right clicks block:
-    - if !<list[anvil|chipped_anvil|damaged_anvil].contains[<context.location.material.name>]>:
-      - stop
+    # Use exact block matchers. The generic "block" matcher can also receive a
+    # modern entity interaction path in this DEV build, where location is not
+    # a valid context and previously spammed the console.
+    on player right clicks anvil:
+    - flag player marallyzen_anvil_pending_block:<context.location> expire:2s
+    on player right clicks chipped_anvil:
+    - flag player marallyzen_anvil_pending_block:<context.location> expire:2s
+    on player right clicks damaged_anvil:
     - flag player marallyzen_anvil_pending_block:<context.location> expire:2s
 
     on player opens anvil:

@@ -1,0 +1,10 @@
+id: demo_intro
+
+lines:
+  - speaker: Спикер
+    audio: 05_dictaphone_prompt
+    text: "Теперь подойди к диктофону и послушай что скажет эта алкашка."
+  - pause: 10t
+  - speaker: Спикер
+    audio: 07_dictaphone_done_2
+    text: "Чувака, это жоско."
