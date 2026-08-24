@@ -5,10 +5,10 @@
 marallyzen_anvil_visual_config:
   type: data
   debug: false
-  item_scale: 0.36
+  item_scale: 0.28
   surface_height: 0.55
   # Each input is this far from the block center, leaving a deliberate gap.
-  slot_offset: 0.20
+  slot_offset: 0.22
 
 marallyzen_anvil_visual_events:
   type: world
@@ -123,9 +123,9 @@ marallyzen_anvil_visual_update:
       - case east:
         - define item_offset <location[<[offset]>,0,0]>
       - case west:
-        - define item_offset <location[-<[offset]>,0,0]>
+        - define item_offset <location[<[offset].mul[-1]>,0,0]>
       - case north:
-        - define item_offset <location[0,0,-<[offset]>]>
+        - define item_offset <location[0,0,<[offset].mul[-1]>]>
     - define position <[anvil].center.add[<[item_offset]>].add[0,<script[marallyzen_anvil_visual_config].data_key[surface_height]>,0]>
     - define scale <script[marallyzen_anvil_visual_config].data_key[item_scale]>
     - spawn item_display[item=<[shown_item]>;display=fixed;pivot=fixed;scale=<[scale]>,<[scale]>,<[scale]>;interpolation_duration=2t;teleport_duration=0t;view_range=16;shadow_radius=0] <[position]> save:anvil_item
