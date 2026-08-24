@@ -10,6 +10,9 @@ marallyzen_story_config:
   use_permission: marallyzen.story.use
   click_cooldown: 10t
   default_look_range: 6
+  default_dialog_range: 6
+  dialog_distance_check_rate: 5t
+  dialog_distance_grace: 10t
 
 marallyzen_story_command:
   type: command
@@ -360,6 +363,7 @@ marallyzen_story_load:
     - define skin_type <yaml[<[yaml_id]>].read[skin.type]||none>
     - define skin_value <yaml[<[yaml_id]>].read[skin.value]||null>
     - define skin_model <yaml[<[yaml_id]>].read[skin.model]||classic>
+    - define dialog_range <yaml[<[yaml_id]>].read[dialog_range]||<script[marallyzen_story_config].data_key[default_dialog_range]>>
     - if <[file_id]> != <[story_id]>:
       - define errors:->:<element[NPC <[story_id]>: поле id равно '<[file_id]>'.]>
     - if <[name]> == null:
@@ -376,6 +380,8 @@ marallyzen_story_load:
       - define errors:->:<element[NPC <[story_id]>: отсутствует skin.value.]>
     - if !<list[classic|slim|auto].contains[<[skin_model]>]>:
       - define errors:->:<element[NPC <[story_id]>: skin.model должен быть classic, slim или auto.]>
+    - if !<[dialog_range].regex_matches[^[0-9]+([.][0-9]+)?$]> || <[dialog_range]> <= 0:
+      - define errors:->:<element[NPC <[story_id]>: dialog_range должен быть числом больше нуля.]>
     - if <[skin_type]> == file:
       - if !<[skin_value].regex_matches[^[A-Za-z0-9_.-]+$]>:
         - define errors:->:<element[NPC <[story_id]>: небезопасное имя файла скина.]>
@@ -394,6 +400,7 @@ marallyzen_story_load:
     - define entry.name_visible:<yaml[<[yaml_id]>].read[name_visible]||false>
     - define entry.look_at_player:<yaml[<[yaml_id]>].read[look_at_player]||true>
     - define entry.look_range:<yaml[<[yaml_id]>].read[look_range]||<script[marallyzen_story_config].data_key[default_look_range]>>
+    - define entry.dialog_range:<[dialog_range]>
     - define npcs.<[story_id]>:<[entry]>
 
   - inject marallyzen_story_load_finish
@@ -661,12 +668,46 @@ marallyzen_story_dialog_start:
   - ratelimit <[viewer]> <script[marallyzen_story_config].data_key[click_cooldown]>
   - define session_key <util.random_uuid>
   - define npc_name Персонаж
+  - define dialog_range 0
   - if <[npc_entity]> != null:
     - define npc_story_id <[npc_entity].flag[marallyzen_story_id]||null>
     - define npc_name <server.flag[marallyzen_story_runtime.npcs.<[npc_story_id]>.name]||Персонаж>
+    - define dialog_range <server.flag[marallyzen_story_runtime.npcs.<[npc_story_id]>.dialog_range]||<script[marallyzen_story_config].data_key[default_dialog_range]>>
   - define start_node <[dialog].get[start]||start>
-  - flag <[viewer]> marallyzen_story_session:map@[key=<[session_key]>;dialog=<[dialog_id]>;node=<[start_node]>;npc=<[npc_entity]>;default_speaker=<[npc_name]>;active_sound=null;awaiting_choice=false;transitions=0]
+  - flag <[viewer]> marallyzen_story_session:map@[key=<[session_key]>;dialog=<[dialog_id]>;node=<[start_node]>;npc=<[npc_entity]>;default_speaker=<[npc_name]>;active_sound=null;awaiting_choice=false;transitions=0;max_distance=<[dialog_range]>]
+  - if <[npc_entity]> != null:
+    - run marallyzen_story_dialog_distance_watch def:<[viewer]>|<[session_key]>|<[npc_entity]>|<[dialog_range]>
   - run marallyzen_story_dialog_play_node def:<[viewer]>|<[session_key]>|<[dialog_id]>|<[start_node]>|<[npc_name]>
+
+marallyzen_story_dialog_distance_watch:
+  type: task
+  debug: false
+  definitions: viewer|session_key|npc_entity|max_distance
+  script:
+  - define check_rate <script[marallyzen_story_config].data_key[dialog_distance_check_rate]>
+  - define check_ticks <[check_rate].as[duration].in_ticks>
+  - define grace_ticks <script[marallyzen_story_config].data_key[dialog_distance_grace].as[duration].in_ticks>
+  - define outside_ticks 0
+  - while <[viewer].is_online||false> && <[viewer].flag[marallyzen_story_session.key]||null> == <[session_key]>:
+    - if !<[npc_entity].is_spawned||false>:
+      - run marallyzen_story_session_stop def:<[viewer]>|false|<element[<gray>Собеседник исчез. Диалог завершён.]>
+      - stop
+    - if <[viewer].world> != <[npc_entity].world>:
+      - run marallyzen_story_session_stop def:<[viewer]>|false|<element[<gray>Вы отошли слишком далеко. Диалог завершён.]>
+      - stop
+    - define distance <[viewer].location.distance[<[npc_entity].location>]>
+    - if <[distance]> > <[max_distance]>:
+      - if <[outside_ticks]> == 0:
+        - actionbar "<yellow>Вы отходите слишком далеко от собеседника..." targets:<[viewer]>
+      - define outside_ticks <[outside_ticks].add[<[check_ticks]>]>
+      - if <[outside_ticks]> >= <[grace_ticks]>:
+        - run marallyzen_story_session_stop def:<[viewer]>|false|<element[<gray>Вы отошли дальше чем на <white><[max_distance]> <gray>блоков. Диалог завершён.]>
+        - stop
+    - else:
+      - if <[outside_ticks]> > 0:
+        - actionbar "" targets:<[viewer]>
+      - define outside_ticks 0
+    - wait <[check_rate]>
 
 marallyzen_story_dialog_play_node:
   type: task
@@ -741,7 +782,7 @@ marallyzen_story_dialog_play_node:
 marallyzen_story_session_stop:
   type: task
   debug: false
-  definitions: viewer|notify
+  definitions: viewer|notify|reason
   script:
   - define session <[viewer].flag[marallyzen_story_session]||null>
   - if <[session]> == null:
@@ -754,5 +795,7 @@ marallyzen_story_session_stop:
     - execute as_server "minecraft:stopsound <[viewer].name> voice <[sound_id].parsed>" silent
   - flag <[viewer]> marallyzen_story_session:!
   - actionbar "" targets:<[viewer]>
-  - if <[notify]> == true:
+  - if <[reason]||null> != null:
+    - actionbar <[reason]> targets:<[viewer]>
+  - else if <[notify]> == true:
     - actionbar "<gray>Диалог остановлен." targets:<[viewer]>

@@ -5,6 +5,7 @@ entity_type: villager
 name_visible: true
 look_at_player: true
 look_range: 7
+dialog_range: 6
 
 # Appearance can be replaced later without touching the dialogue tree.
 skin:
