@@ -180,7 +180,21 @@ marallyzen_story_events:
     - if <[owner]> != <player.uuid>:
       - stop
     - determine passively cancelled
+    - run marallyzen_story_choice_ui_select def:<player>|<[target].flag[marallyzen_story_choice_index]||1>
     - run marallyzen_story_choice_select def:<player>|<[target].flag[marallyzen_story_choice_session]||null>|<[target].flag[marallyzen_story_choice_id]||null>
+
+    on player scrolls their hotbar:
+    - if <player.flag[marallyzen_story_session.awaiting_choice]||false> != true:
+      - stop
+    - determine passively cancelled
+    - ratelimit <player> 1t
+    - define delta <context.new_slot.sub[<context.previous_slot>]>
+    - if <[delta]> == 1 || <[delta]> == -8:
+      - define step 1
+    - else:
+      - define step -1
+    - define selected <player.flag[marallyzen_story_session.selected_index]||1>
+    - run marallyzen_story_choice_ui_select def:<player>|<[selected].add[<[step]>]>
 
     on player right clicks entity:
     - if <context.hand> != mainhand:
@@ -192,6 +206,12 @@ marallyzen_story_events:
     - if <[story_id]> == null:
       - stop
     - determine passively cancelled
+    - define active_session <player.flag[marallyzen_story_session]||null>
+    - if <[active_session]> != null && <[active_session].get[awaiting_choice]||false> == true && <[active_session].get[npc]||null> == <[target]>:
+      - define selected_choice <[active_session].get[selected_choice]||null>
+      - if <[selected_choice]> != null:
+        - run marallyzen_story_choice_select def:<player>|<[active_session].get[key]>|<[selected_choice]>
+      - stop
     - ratelimit <player> 2t
     - if !<player.is_op> && !<player.has_permission[marallyzen.story.use]>:
       - actionbar "<gray>Вы пока не можете поговорить с этим персонажем." targets:<player>
@@ -552,43 +572,53 @@ marallyzen_story_choice_ui_show:
     - flag server marallyzen_story_choice_ui_entities:->:<[hitbox]>
   - flag <[viewer]> marallyzen_story_session.choice_ui:<[ui_entities]>
   - flag <[viewer]> marallyzen_story_session.choice_interactions:<[interactions]>
-  - flag <[viewer]> marallyzen_story_session.highlighted_choice:null
-  - run marallyzen_story_choice_ui_watch def:<[viewer]>|<[session_key]>
+  - flag <[viewer]> marallyzen_story_session.selected_index:1
+  - run marallyzen_story_choice_ui_select def:<[viewer]>|1
 
-marallyzen_story_choice_ui_watch:
+marallyzen_story_choice_ui_select:
   type: task
   debug: false
-  definitions: viewer|session_key
+  definitions: viewer|requested_index
   script:
-  - while <[viewer].is_online||false> && <[viewer].flag[marallyzen_story_session.key]||null> == <[session_key]> && <[viewer].flag[marallyzen_story_session.awaiting_choice]||false> == true:
-    - define hovered <[viewer].precise_target[8].type[interaction]||null>
-    - if <[hovered]> != null && <[hovered].flag[marallyzen_story_choice_owner]||null> != <[viewer].uuid>:
-      - define hovered null
-    - define previous <[viewer].flag[marallyzen_story_session.highlighted_choice]||null>
-    - if <[hovered]> != <[previous]>:
-      - if <[previous]> != null && <[previous].is_spawned||false>:
-        - define old_display <[previous].flag[marallyzen_story_choice_display]||null>
-        - if <[old_display]> != null && <[old_display].is_spawned||false>:
-          - define old_text <element[<[previous].flag[marallyzen_story_choice_index]>. <[previous].flag[marallyzen_story_choice_label]>]>
-          - define old_offset <[old_text].text_width.mul[0.009]>
-          - define old_location <[previous].flag[marallyzen_story_choice_origin].add[<[previous].flag[marallyzen_story_choice_side].mul[<[old_offset]>]>]>
-          - teleport <[old_display]> <[old_location]>
-          - adjust <[old_display]> text:<[old_text].color[white]>
-          - adjust <[old_display]> background_color:<color[transparent]>
-          - adjust <[old_display]> text_shadowed:true
-      - if <[hovered]> != null && <[hovered].is_spawned||false>:
-        - define new_display <[hovered].flag[marallyzen_story_choice_display]||null>
-        - if <[new_display]> != null && <[new_display].is_spawned||false>:
-          - define selected_label <[hovered].flag[marallyzen_story_choice_label].strip_color>
-          - define selected_text <element[◀ <[selected_label]>]>
-          - define selected_offset <[selected_text].text_width.mul[0.009]>
-          - define selected_location <[hovered].flag[marallyzen_story_choice_origin].add[<[hovered].flag[marallyzen_story_choice_side].mul[<[selected_offset]>]>]>
-          - teleport <[new_display]> <[selected_location]>
-          - adjust <[new_display]> text:<[selected_text].color[#1A1408]>
-          - adjust <[new_display]> background_color:<color[#F2B63DFF]>
-          - adjust <[new_display]> text_shadowed:false
-      - flag <[viewer]> marallyzen_story_session.highlighted_choice:<[hovered]>
-    - wait 2t
+  - if !<[viewer].is_online||false> || <[viewer].flag[marallyzen_story_session.awaiting_choice]||false> != true:
+    - stop
+  - define interactions <[viewer].flag[marallyzen_story_session.choice_interactions]||<list[]>>
+  - if <[interactions].is_empty>:
+    - stop
+  - define selected_index <[requested_index]>
+  - if <[selected_index]> < 1:
+    - define selected_index <[interactions].size>
+  - else if <[selected_index]> > <[interactions].size>:
+    - define selected_index 1
+  - define previous_index <[viewer].flag[marallyzen_story_session.selected_index]||null>
+  - if <[previous_index]> != null:
+    - define previous <[interactions].get[<[previous_index]>]||null>
+    - if <[previous]> != null && <[previous].is_spawned||false>:
+      - define old_display <[previous].flag[marallyzen_story_choice_display]||null>
+      - if <[old_display]> != null && <[old_display].is_spawned||false>:
+        - define old_text <element[<[previous].flag[marallyzen_story_choice_index]>. <[previous].flag[marallyzen_story_choice_label]>]>
+        - define old_offset <[old_text].text_width.mul[0.009]>
+        - define old_location <[previous].flag[marallyzen_story_choice_origin].add[<[previous].flag[marallyzen_story_choice_side].mul[<[old_offset]>]>]>
+        - teleport <[old_display]> <[old_location]>
+        - adjust <[old_display]> text:<[old_text].color[white]>
+        - adjust <[old_display]> background_color:<color[transparent]>
+        - adjust <[old_display]> text_shadowed:true
+  - define selected <[interactions].get[<[selected_index]>]>
+  - if <[selected]> == null || !<[selected].is_spawned||false>:
+    - stop
+  - define new_display <[selected].flag[marallyzen_story_choice_display]||null>
+  - if <[new_display]> == null || !<[new_display].is_spawned||false>:
+    - stop
+  - define selected_label <[selected].flag[marallyzen_story_choice_label].strip_color>
+  - define selected_text <element[◀ <[selected_label]>]>
+  - define selected_offset <[selected_text].text_width.mul[0.009]>
+  - define selected_location <[selected].flag[marallyzen_story_choice_origin].add[<[selected].flag[marallyzen_story_choice_side].mul[<[selected_offset]>]>]>
+  - teleport <[new_display]> <[selected_location]>
+  - adjust <[new_display]> text:<[selected_text].color[#3A3A3A]>
+  - adjust <[new_display]> background_color:<color[#F2B63DFF]>
+  - adjust <[new_display]> text_shadowed:false
+  - flag <[viewer]> marallyzen_story_session.selected_index:<[selected_index]>
+  - flag <[viewer]> marallyzen_story_session.selected_choice:<[selected].flag[marallyzen_story_choice_id]>
 
 marallyzen_story_choice_ui_clear:
   type: task
@@ -602,7 +632,8 @@ marallyzen_story_choice_ui_clear:
     - flag server marallyzen_story_choice_ui_entities:<-:<[ui_entity]>
   - flag <[viewer]> marallyzen_story_session.choice_ui:!
   - flag <[viewer]> marallyzen_story_session.choice_interactions:!
-  - flag <[viewer]> marallyzen_story_session.highlighted_choice:!
+  - flag <[viewer]> marallyzen_story_session.selected_index:!
+  - flag <[viewer]> marallyzen_story_session.selected_choice:!
 
 marallyzen_story_choice_ui_cleanup_all:
   type: task
