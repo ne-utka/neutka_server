@@ -1,56 +1,56 @@
-# Makes an exposed stonecutter blade deal contact damage while stood upon.
-# A per-player mutex prevents the rapidly firing step event from spawning many
-# simultaneous damage queues.
+# Makes an exposed stonecutter blade deal continuous contact damage.
+# A single global scanner is used instead of the unreliable one-shot step
+# event, so standing still and entering from any block edge behave identically.
 
 marallyzen_stonecutter_damage_config:
   type: data
   debug: false
-  # Minecraft health is measured in half-hearts: 2 HP = one full heart.
-  damage: 2
+  # Minecraft health is measured in half-hearts: 6 HP = three full hearts.
+  damage: 6
   interval: 10t
+  # A player is 0.6 blocks wide. Probe close to all four footprint corners so
+  # touching the blade from an edge counts even when the player's center is on
+  # the neighbouring block.
+  footprint_radius: 0.29
 
 marallyzen_stonecutter_damage_events:
   type: world
   debug: false
   events:
-    on player steps on stonecutter:
-    - if <player.has_flag[marallyzen_stonecutter_damage_active]>:
-      - stop
+    on reload scripts:
     - define session <util.random_uuid>
-    # The expiry makes the mechanic recover automatically if queues are stopped
-    # by a script reload while a player is still standing on the blade.
-    - flag player marallyzen_stonecutter_damage_active:<[session]> expire:2s
-    - run marallyzen_stonecutter_damage_loop def:<player>|<[session]>|<context.location>
-
-    on player dies:
-    - flag player marallyzen_stonecutter_damage_active:!
-
-    on player quits:
-    - flag player marallyzen_stonecutter_damage_active:!
+    # Replacing the session instantly retires a loop left by /ex reload. The
+    # expiry also recovers if a queue is externally stopped.
+    - flag server marallyzen_stonecutter_scanner:<[session]> expire:2s
+    - run marallyzen_stonecutter_damage_loop def:<[session]>
 
 marallyzen_stonecutter_damage_loop:
   type: task
   debug: false
-  definitions: victim|session|cutter
+  definitions: session
   script:
-  - while <[victim].flag[marallyzen_stonecutter_damage_active]||null> == <[session]>:
-    # Keep spawned-entity tags on separate lines: Denizen resolves every tag in
-    # a condition before comparing it, so this avoids errors after disconnects.
-    - if !<[victim].is_online||false>:
-      - stop
-    - if <[victim].health||0> <= 0:
-      - flag <[victim]> marallyzen_stonecutter_damage_active:!
-      - stop
-    # Test the block immediately under the player's feet against the exact
-    # cutter that started this queue. Walking onto another block ends it and a
-    # fresh step event can safely start another session.
-    - define standing_block <[victim].location.sub[0,0.2,0].block_location>
-    - if <[cutter].material.name> != stonecutter || <[standing_block]> != <[cutter].block_location>:
-      - flag <[victim]> marallyzen_stonecutter_damage_active:!
-      - stop
-    - flag <[victim]> marallyzen_stonecutter_damage_active:<[session]> expire:2s
-    # Vanilla damage immunity lasts longer than the requested 10-tick cadence.
-    # Reset only its current remainder so every stonecutter pulse is applied.
-    - adjust <[victim]> no_damage_duration:0t
-    - hurt <script[marallyzen_stonecutter_damage_config].data_key[damage]> <[victim]> cause:contact source:<[cutter]>
+  - while <server.flag[marallyzen_stonecutter_scanner]||null> == <[session]>:
+    - flag server marallyzen_stonecutter_scanner:<[session]> expire:2s
+    - define radius <script[marallyzen_stonecutter_damage_config].data_key[footprint_radius]>
+    - foreach <server.online_players> as:victim:
+      - if <[victim].gamemode> == spectator || <[victim].health||0> <= 0:
+        - foreach next
+      - define feet <[victim].location.sub[0,0.12,0]>
+      - define probes <list[]>
+      - define probes:->:<[feet]>
+      - define probes:->:<[feet].add[<[radius]>,0,<[radius]>]>
+      - define probes:->:<[feet].add[<[radius]>,0,-<[radius]>]>
+      - define probes:->:<[feet].add[-<[radius]>,0,<[radius]>]>
+      - define probes:->:<[feet].add[-<[radius]>,0,-<[radius]>]>
+      - define cutter null
+      - foreach <[probes]> as:probe:
+        - if <[probe].material.name> == stonecutter:
+          - define cutter <[probe].block_location>
+          - foreach stop
+      - if <[cutter]> == null:
+        - foreach next
+      # Vanilla damage immunity lasts longer than the requested 10-tick
+      # cadence. Reset its current remainder so every pulse is applied.
+      - adjust <[victim]> no_damage_duration:0t
+      - hurt <script[marallyzen_stonecutter_damage_config].data_key[damage]> <[victim]> cause:contact source:<[cutter]>
     - wait <script[marallyzen_stonecutter_damage_config].data_key[interval]>
