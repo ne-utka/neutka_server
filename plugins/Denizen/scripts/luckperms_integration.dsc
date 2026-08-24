@@ -9,9 +9,11 @@ marallyzen_luckperms_events:
     on server start:
     - run marallyzen_luckperms_bootstrap delay:10s
     - run marallyzen_luckperms_bootstrap_v2 delay:12s
+    - run marallyzen_luckperms_bootstrap_v3 delay:14s
 
     on reload scripts:
     - run marallyzen_luckperms_bootstrap_v2 delay:2s
+    - run marallyzen_luckperms_bootstrap_v3 delay:3s
 
 marallyzen_luckperms_bootstrap:
   type: task
@@ -57,3 +59,14 @@ marallyzen_luckperms_bootstrap_v2:
     - stop
   - execute as_server "lp group builder permission set marallyzen.identity.admin true" silent
   - flag server marallyzen_luckperms_bootstrap_v2:true
+
+marallyzen_luckperms_bootstrap_v3:
+  type: task
+  debug: false
+  script:
+  - if <server.has_flag[marallyzen_luckperms_bootstrap_v3]>:
+    - stop
+  # Cutscenes can change another player's camera and gamemode, so unlike the
+  # content placement tools this remains restricted to the admin chain.
+  - execute as_server "lp group admin permission set marallyzen.cutscene.admin true" silent
+  - flag server marallyzen_luckperms_bootstrap_v3:true

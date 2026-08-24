@@ -77,3 +77,17 @@
 ```
 
 Первые три административные команды выдаются только нужным ролям через LuckPerms.
+
+## Кат-сцены
+
+```text
+/cutscene record <name> [seconds]
+/cutscene stop
+/cutscene play <name> [player]
+/cutscene cancel [player]
+/cutscene list
+/cutscene info <name>
+/cutscene delete <name>
+```
+
+Запись идёт с частотой 20 кадров в секунду. `/cutscene stop` сохраняет текущий маршрут, а `Shift` позволяет зрителю досрочно завершить воспроизведение. Максимальная продолжительность одной записи — 300 секунд. Право: `marallyzen.cutscene.admin`.
