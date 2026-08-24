@@ -6,7 +6,7 @@ marallyzen_anvil_visual_config:
   type: data
   debug: false
   item_scale: 0.18
-  surface_height: 0.58
+  surface_height: 0.55
   # Each input is this far from the block center, leaving a deliberate gap.
   slot_offset: 0.20
 
