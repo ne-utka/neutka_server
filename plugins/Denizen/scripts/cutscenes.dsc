@@ -14,12 +14,15 @@ marallyzen_cutscene_config:
   max_loaded_chunks: 48
   sample_interval: 1t
   camera_interpolation: 2t
+  actor_record_radius: 48
+  max_recorded_actors: 8
 
 marallyzen_cutscene_events:
   type: world
   debug: false
   events:
     on reload scripts:
+    - run marallyzen_cutscene_cleanup_orphan_actors
     - foreach <server.online_players> as:viewer:
       - flag <[viewer]> marallyzen_cutscene_recording:!
       - if <[viewer].has_flag[marallyzen_cutscene_recovery]>:
@@ -37,8 +40,16 @@ marallyzen_cutscene_events:
       - if <[camera]> != null:
         - if <[camera].is_spawned||false>:
           - remove <[camera]>
+      - foreach <player.flag[marallyzen_cutscene_recovery.actors]||<list[]>> as:actor_npc:
+        - if <server.npcs.contains[<[actor_npc]>]>:
+          - remove <[actor_npc]>
       # Keep recovery persistent. The join event restores location and mode.
       - flag player marallyzen_cutscene_session:!
+
+    # A short-lived marker lets the recorder sample discrete arm animations
+    # without installing packet listeners or writing any per-tick server flags.
+    on player animates:
+    - flag player marallyzen_cutscene_last_animation:<context.animation> expire:2t
 
     # Shift is the universal, discoverable skip input. Cancelling the sneak
     # event also prevents vanilla from dismounting the camera before cleanup.
@@ -172,8 +183,10 @@ marallyzen_cutscene_command:
         - narrate "<red>Такой кат-сцены не существует."
         - stop
       - define frames <[record].get[frame_count]||<[record].get[frames].size||0>>
+      - define actors <[record].get[actor_profiles].size||0>
       - narrate "<gold>Кат-сцена: <white><[name]>"
       - narrate "<gray>Длительность: <white><[frames].div[20].round_to[2]> с. <dark_gray>(<[frames]> кадров)"
+      - narrate "<gray>Записано актёров: <white><[actors]>"
       - narrate "<gray>Мир: <white><[record].get[world]||неизвестно>"
       - narrate "<gray>Создатель UUID: <white><[record].get[creator]||неизвестно>"
 
@@ -235,8 +248,12 @@ marallyzen_cutscene_record:
     - stop
   - actionbar "<green>Запись началась! <gray>/cutscene stop — сохранить" targets:<[recorder]>
   - define frames <list[]>
+  - define actor_frames <list[]>
+  - define actor_profiles <map[]>
   - define record_world <[recorder].location.world.name>
   - define world_changed false
+  - define actor_radius <script[marallyzen_cutscene_config].data_key[actor_record_radius]>
+  - define max_actors <script[marallyzen_cutscene_config].data_key[max_recorded_actors]>
   - repeat <[max_frames]> as:frame_index:
     - define state <[recorder].flag[marallyzen_cutscene_recording]||null>
     - if <[state]> == null:
@@ -251,8 +268,29 @@ marallyzen_cutscene_record:
       - define world_changed true
       - repeat stop
     - define frames:->:<[recorder].eye_location>
+    - define actor_frame <map[]>
+    - foreach <[recorder].location.find_players_within[<[actor_radius]>]> as:actor:
+      - if <[actor]> == <[recorder]>:
+        - foreach next
+      - define actor_id <[actor].uuid>
+      - if !<[actor_profiles].contains[<[actor_id]>]>:
+        - if <[actor_profiles].size> >= <[max_actors]>:
+          - foreach next
+        - definemap actor_profile:
+            name: <[actor].name>
+            skin_blob: <[actor].skin_blob>
+            equipment: <[actor].equipment_map>
+            hand: <[actor].item_in_hand>
+            offhand: <[actor].item_in_offhand>
+        - define actor_profiles <[actor_profiles].with[<[actor_id]>].as[<[actor_profile]>]>
+      - definemap actor_state:
+          location: <[actor].location>
+          pose: <[actor].visual_pose>
+          animation: <[actor].flag[marallyzen_cutscene_last_animation]||none>
+      - define actor_frame <[actor_frame].with[<[actor_id]>].as[<[actor_state]>]>
+    - define actor_frames:->:<[actor_frame]>
     - if <[frame_index].mod[10]> == 0:
-      - actionbar "<gray>● Запись <white><[name]> <dark_gray>— <gray><[frame_index].div[20].round_to[1]> с." targets:<[recorder]>
+      - actionbar "<gray>● Запись <white><[name]> <dark_gray>— <gray><[frame_index].div[20].round_to[1]> с. <dark_gray>• <gray>актёров: <white><[actor_profiles].size>" targets:<[recorder]>
     - wait <script[marallyzen_cutscene_config].data_key[sample_interval]>
 
   - define state <[recorder].flag[marallyzen_cutscene_recording]||null>
@@ -269,9 +307,9 @@ marallyzen_cutscene_record:
     - if <[recorder].is_online||false>:
       - actionbar "<red>Не записано ни одного кадра." targets:<[recorder]>
     - stop
-  - flag server marallyzen_cutscenes.<[name]>:map@[format_version=1;creator=<[recorder].uuid>;world=<[record_world]>;frame_count=<[frames].size>;frames=<[frames]>]
+  - flag server marallyzen_cutscenes.<[name]>:map@[format_version=2;creator=<[recorder].uuid>;world=<[record_world]>;frame_count=<[frames].size>;frames=<[frames]>;actor_profiles=<[actor_profiles]>;actor_frames=<[actor_frames]>]
   - if <[recorder].is_online||false>:
-    - actionbar "<green>Кат-сцена <white><[name]><green> сохранена: <white><[frames].size><green> кадров." targets:<[recorder]>
+    - actionbar "<green>Кат-сцена <white><[name]><green> сохранена: <white><[frames].size><green> кадров, <white><[actor_profiles].size><green> актёров." targets:<[recorder]>
     - if <[world_changed]>:
       - narrate "<yellow>Запись остановлена перед переходом в другой мир." targets:<[recorder]>
 
@@ -287,6 +325,8 @@ marallyzen_cutscene_play:
     - actionbar "<red>Кат-сцена не найдена." targets:<[viewer]>
     - stop
   - define frames <[record].get[frames]||<list[]>>
+  - define actor_profiles <[record].get[actor_profiles]||<map[]>>
+  - define actor_frames <[record].get[actor_frames]||<list[]>>
   - if <[frames].is_empty>:
     - actionbar "<red>В кат-сцене нет кадров." targets:<[viewer]>
     - stop
@@ -306,8 +346,8 @@ marallyzen_cutscene_play:
   - define return_gamemode <[viewer].gamemode>
   - define return_can_fly <[viewer].can_fly>
   - define return_flying <[viewer].is_flying>
-  - flag <[viewer]> marallyzen_cutscene_recovery:map@[id=<[session]>;location=<[return_location]>;gamemode=<[return_gamemode]>;can_fly=<[return_can_fly]>;flying=<[return_flying]>;camera=null]
-  - flag <[viewer]> marallyzen_cutscene_session:map@[id=<[session]>;name=<[name]>;camera=null;cancel_requested=false]
+  - flag <[viewer]> marallyzen_cutscene_recovery:map@[id=<[session]>;location=<[return_location]>;gamemode=<[return_gamemode]>;can_fly=<[return_can_fly]>;flying=<[return_flying]>;camera=null;actors=<list[]>;hidden_players=<list[]>]
+  - flag <[viewer]> marallyzen_cutscene_session:map@[id=<[session]>;name=<[name]>;camera=null;cancel_requested=false;actors=<list[]>]
 
   # Poses use their own mounts. Clear them before attaching the camera so the
   # two systems cannot fight over the player's vehicle or visual metadata.
@@ -341,6 +381,9 @@ marallyzen_cutscene_play:
   - actionbar "<gray>Кат-сцена <white><[name]> <dark_gray>• <gray>Shift — пропустить" targets:<[viewer]>
 
   - define cancelled false
+  - define actor_npcs <map[]>
+  - define actor_visibility <map[]>
+  - define actor_last_animation <map[]>
   - foreach <[frames]> as:frame:
     - if !<[viewer].is_online||false>:
       - if <[camera].is_spawned||false>:
@@ -353,6 +396,56 @@ marallyzen_cutscene_play:
       - define cancelled true
       - foreach stop
     - teleport <[camera]> <[frame]>
+    - define actor_frame <[actor_frames].get[<[loop_index]>]||<map[]>>
+
+    # Hide clones that left the recorded radius at this exact frame.
+    - foreach <[actor_npcs].keys> as:actor_id:
+      - if !<[actor_frame].contains[<[actor_id]>]> && <[actor_visibility].get[<[actor_id]>]||false>:
+        - adjust <[viewer]> hide_entity:<[actor_npcs].get[<[actor_id]>]>
+        - define actor_visibility <[actor_visibility].with[<[actor_id]>].as[false]>
+
+    # Create each clone lazily on its first recorded frame. The clone and the
+    # hidden live original are both viewer-specific, so parallel viewings do
+    # not leak actors into the normal world or interfere with one another.
+    - foreach <[actor_frame].keys> as:actor_id:
+      - define actor_state <[actor_frame].get[<[actor_id]>]>
+      - define actor_npc <[actor_npcs].get[<[actor_id]>]||null>
+      - if <[actor_npc]> == null:
+        - define actor_profile <[actor_profiles].get[<[actor_id]>]||null>
+        - if <[actor_profile]> == null:
+          - foreach next
+        - define actor_name <[actor_profile].get[name]||Actor>
+        - create player <[actor_name]> <[actor_state].get[location]> save:cutscene_actor
+        - define actor_npc <entry[cutscene_actor].created_npc||null>
+        - if <[actor_npc]> == null:
+          - foreach next
+        - adjust <[actor_npc]> skin_blob:<[actor_profile].get[skin_blob].append[;<[actor_name]>]>
+        - adjust <[actor_npc]> name_visible:false
+        - adjust <[actor_npc]> set_protected:true
+        - adjust <[actor_npc]> targetable:false
+        - adjust <[actor_npc]> hide_from_players
+        - adjust <[viewer]> show_entity:<[actor_npc]>
+        - define equipment <[actor_profile].get[equipment]||<map[]>>
+        - equip <[actor_npc]> hand:<[actor_profile].get[hand]||air> offhand:<[actor_profile].get[offhand]||air> head:<[equipment].get[helmet]||air> chest:<[equipment].get[chestplate]||air> legs:<[equipment].get[leggings]||air> boots:<[equipment].get[boots]||air>
+        - flag <[actor_npc]> marallyzen_cutscene_actor:<[session]>
+        - flag <[viewer]> marallyzen_cutscene_recovery.actors:->:<[actor_npc]>
+        - flag <[viewer]> marallyzen_cutscene_session.actors:->:<[actor_npc]>
+        - define actor_npcs <[actor_npcs].with[<[actor_id]>].as[<[actor_npc]>]>
+        - define actor_visibility <[actor_visibility].with[<[actor_id]>].as[true]>
+        - define real_actor <player[<[actor_id]>]>
+        - if <[real_actor].is_online||false> && <[real_actor]> != <[viewer]>:
+          - adjust <[viewer]> hide_entity:<[real_actor]>
+          - flag <[viewer]> marallyzen_cutscene_recovery.hidden_players:->:<[real_actor]>
+      - else if !<[actor_visibility].get[<[actor_id]>]||false>:
+        - adjust <[viewer]> show_entity:<[actor_npc]>
+        - define actor_visibility <[actor_visibility].with[<[actor_id]>].as[true]>
+      - teleport <[actor_npc]> <[actor_state].get[location]>
+      - adjust <[actor_npc]> visual_pose:<[actor_state].get[pose]||standing>
+      - define animation <[actor_state].get[animation]||none>
+      - define previous_animation <[actor_last_animation].get[<[actor_id]>]||none>
+      - if <[animation]> != none && <[animation]> != <[previous_animation]>:
+        - animate <[actor_npc]> animation:<[animation]> for:<[viewer]>
+      - define actor_last_animation <[actor_last_animation].with[<[actor_id]>].as[<[animation]>]>
     - if <[loop_index].mod[20]> == 0:
       - actionbar "<gray>Кат-сцена <white><[name]> <dark_gray>• <gray>Shift — пропустить" targets:<[viewer]>
     - wait <script[marallyzen_cutscene_config].data_key[sample_interval]>
@@ -372,10 +465,15 @@ marallyzen_cutscene_restore:
   - if <[session]> != null && <[recovery].get[id]||null> != <[session]>:
     - stop
   - define camera <[recovery].get[camera]||<[viewer].flag[marallyzen_cutscene_session.camera]||null>>
+  - define actors <[recovery].get[actors]||<list[]>>
+  - define hidden_players <[recovery].get[hidden_players]||<list[]>>
   - if !<[viewer].is_online||false>:
     - if <[camera]> != null:
       - if <[camera].is_spawned||false>:
         - remove <[camera]>
+    - foreach <[actors]> as:actor_npc:
+      - if <server.npcs.contains[<[actor_npc]>]>:
+        - remove <[actor_npc]>
     - flag <[viewer]> marallyzen_cutscene_session:!
     - stop
 
@@ -391,6 +489,12 @@ marallyzen_cutscene_restore:
   - else:
     - adjust <[viewer]> flying:false
   - adjust <[viewer]> show_to_players
+  - foreach <[hidden_players]> as:hidden_player:
+    - if <[hidden_player].is_online||false>:
+      - adjust <[viewer]> show_entity:<[hidden_player]>
+  - foreach <[actors]> as:actor_npc:
+    - if <server.npcs.contains[<[actor_npc]>]>:
+      - remove <[actor_npc]>
   - if <[camera]> != null:
     - if <[camera].is_spawned||false>:
       - remove <[camera]>
@@ -405,3 +509,11 @@ marallyzen_cutscene_restore:
       - actionbar "<red>Кат-сцена остановлена из-за ошибки камеры." targets:<[viewer]>
     - default:
       - actionbar "<gray>Состояние после кат-сцены восстановлено." targets:<[viewer]>
+
+marallyzen_cutscene_cleanup_orphan_actors:
+  type: task
+  debug: false
+  script:
+  - foreach <server.npcs> as:actor_npc:
+    - if <[actor_npc].has_flag[marallyzen_cutscene_actor]>:
+      - remove <[actor_npc]>
