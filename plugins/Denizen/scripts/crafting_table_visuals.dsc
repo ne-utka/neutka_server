@@ -94,6 +94,19 @@ marallyzen_crafting_visual_update:
     - define side north
   - else:
     - define side east
+  # FIXED item models use the opposite edge as their visual "top" after the
+  # +90 degree X rotation that lays them flat. Add a half-turn here so beds,
+  # tools and every other directional sprite point away from the crafter
+  # instead of appearing upside down. Grid coordinates are rotated separately.
+  - choose <[side]>:
+    - case south:
+      - define item_yaw 3.141592654
+    - case north:
+      - define item_yaw 0
+    - case west:
+      - define item_yaw 1.570796327
+    - case east:
+      - define item_yaw -1.570796327
   - define matrix <player.open_inventory.matrix||<list[]>>
   - repeat 9 as:slot:
     - define item <[matrix].get[<[slot]>]||air>
@@ -114,15 +127,7 @@ marallyzen_crafting_visual_update:
       - adjust <[entity]> display:fixed
       - adjust <[entity]> pivot:fixed
       - adjust <[entity]> right_rotation:<location[1,0,0].to_axis_angle_quaternion[1.570796327]>
-      - choose <[side]>:
-        - case south:
-          - adjust <[entity]> left_rotation:<location[0,1,0].to_axis_angle_quaternion[0]>
-        - case north:
-          - adjust <[entity]> left_rotation:<location[0,1,0].to_axis_angle_quaternion[3.141592654]>
-        - case west:
-          - adjust <[entity]> left_rotation:<location[0,1,0].to_axis_angle_quaternion[-1.570796327]>
-        - case east:
-          - adjust <[entity]> left_rotation:<location[0,1,0].to_axis_angle_quaternion[1.570796327]>
+      - adjust <[entity]> left_rotation:<location[0,1,0].to_axis_angle_quaternion[<[item_yaw]>]>
       - repeat next
 
     - define zero <[slot].sub[1]>
@@ -143,15 +148,7 @@ marallyzen_crafting_visual_update:
     - spawn item_display[item=<[shown_item]>;display=fixed;pivot=fixed;scale=<[scale]>,<[scale]>,<[scale]>;interpolation_duration=2t;teleport_duration=0t;view_range=16;shadow_radius=0] <[position]> save:crafting_item
     - define entity <entry[crafting_item].spawned_entity>
     - adjust <[entity]> right_rotation:<location[1,0,0].to_axis_angle_quaternion[1.570796327]>
-    - choose <[side]>:
-      - case south:
-        - adjust <[entity]> left_rotation:<location[0,1,0].to_axis_angle_quaternion[0]>
-      - case north:
-        - adjust <[entity]> left_rotation:<location[0,1,0].to_axis_angle_quaternion[3.141592654]>
-      - case west:
-        - adjust <[entity]> left_rotation:<location[0,1,0].to_axis_angle_quaternion[-1.570796327]>
-      - case east:
-        - adjust <[entity]> left_rotation:<location[0,1,0].to_axis_angle_quaternion[1.570796327]>
+    - adjust <[entity]> left_rotation:<location[0,1,0].to_axis_angle_quaternion[<[item_yaw]>]>
     - adjust <[entity]> force_no_persist:true
     - flag <[entity]> marallyzen_crafting_grid_display:true
     - flag player marallyzen_crafting_visual.entities.<[slot]>:<[entity]>
