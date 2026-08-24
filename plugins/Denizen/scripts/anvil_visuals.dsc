@@ -82,16 +82,11 @@ marallyzen_anvil_visual_update:
     - run marallyzen_anvil_visual_cleanup
     - stop
 
-  # Snap to the same four player-relative orientations used by the workbench.
-  - define yaw <player.location.yaw.add[360].mod[360]>
-  - if <[yaw]> < 45 || <[yaw]> >= 315:
-    - define side south
-  - else if <[yaw]> < 135:
-    - define side west
-  - else if <[yaw]> < 225:
-    - define side north
-  - else:
-    - define side east
+  # An anvil is rectangular, so its input row belongs to the block rather
+  # than to the user. The facing determines its long axis: north/south uses
+  # the X axis and east/west uses the Z axis. Approaching from another side
+  # must never rotate or rearrange the public display.
+  - define side <[anvil].material.direction.to_lowercase>
 
   # Anvil slots 1 and 2 are inputs. Slot 3 is the result and is ignored.
   - repeat 2 as:slot:
