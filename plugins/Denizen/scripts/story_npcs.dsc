@@ -504,9 +504,11 @@ marallyzen_story_choice_ui_show:
     - adjust <[display]> text:<element[<[index]>. <[label]>].color[white]>
     - adjust <[display]> pivot:center
     - adjust <[display]> display:left
+    - adjust <[display]> line_width:1000
     - adjust <[display]> default_background:false
     - adjust <[display]> background_color:<color[transparent]>
     - adjust <[display]> text_shadowed:true
+    - adjust <[display]> opacity:255
     - adjust <[display]> see_through:false
     - adjust <[display]> scale:<location[0.9,0.9,0.9]>
     - spawn interaction[width=3.4;height=0.34;is_aware=true] <[line_location].add[0,-0.17,0]> save:story_choice_hitbox
@@ -549,11 +551,14 @@ marallyzen_story_choice_ui_watch:
         - if <[old_display]> != null && <[old_display].is_spawned||false>:
           - adjust <[old_display]> text:<element[<[previous].flag[marallyzen_story_choice_index]>. <[previous].flag[marallyzen_story_choice_label]>].color[white]>
           - adjust <[old_display]> background_color:<color[transparent]>
+          - adjust <[old_display]> text_shadowed:true
       - if <[hovered]> != null && <[hovered].is_spawned||false>:
         - define new_display <[hovered].flag[marallyzen_story_choice_display]||null>
         - if <[new_display]> != null && <[new_display].is_spawned||false>:
-          - adjust <[new_display]> text:<element[◀ <[hovered].flag[marallyzen_story_choice_label]>].color[black]>
-          - adjust <[new_display]> background_color:<color[#E9B544]>
+          - define selected_label <[hovered].flag[marallyzen_story_choice_label].strip_color>
+          - adjust <[new_display]> text:<element[◀ <[selected_label]>].color[#1A1408]>
+          - adjust <[new_display]> background_color:<color[#F2B63DFF]>
+          - adjust <[new_display]> text_shadowed:false
       - flag <[viewer]> marallyzen_story_session.highlighted_choice:<[hovered]>
     - wait 2t
 
