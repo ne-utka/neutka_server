@@ -56,7 +56,7 @@ marallyzen_cutscene_command:
   aliases:
   - cuts
   description: Записывает и воспроизводит кат-сцены Marallyzen.
-  usage: /cutscene record <name> [seconds] | stop | play <name> [player] | cancel [player] | list | info <name> | delete <name>
+  usage: /cutscene record [name] [seconds] | stop | play [name] [player] | cancel [player] | list | info [name] | delete [name]
   permission: marallyzen.cutscene.admin
   tab completions:
     1: record|stop|play|cancel|list|info|delete
@@ -186,13 +186,13 @@ marallyzen_cutscene_command:
       - narrate "<green>Кат-сцена <white><[name]><green> удалена."
 
     - default:
-      - narrate "<gold>/cutscene record <name> [seconds] <gray>— начать запись"
+      - narrate "<gold>/cutscene record [name] [seconds] <gray>— начать запись"
       - narrate "<gold>/cutscene stop <gray>— сохранить текущую запись"
-      - narrate "<gold>/cutscene play <name> [player] <gray>— воспроизвести"
+      - narrate "<gold>/cutscene play [name] [player] <gray>— воспроизвести"
       - narrate "<gold>/cutscene cancel [player] <gray>— отменить запись или просмотр"
       - narrate "<gold>/cutscene list <gray>— список записей"
-      - narrate "<gold>/cutscene info <name> <gray>— информация"
-      - narrate "<gold>/cutscene delete <name> <gray>— удалить"
+      - narrate "<gold>/cutscene info [name] <gray>— информация"
+      - narrate "<gold>/cutscene delete [name] <gray>— удалить"
 
 marallyzen_cutscene_tab_second:
   type: procedure
