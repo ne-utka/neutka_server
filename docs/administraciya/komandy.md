@@ -11,8 +11,11 @@
 /poster remove
 /poster variant <default|alive|dead|band>
 /poster rebuild
+/poster force
 /poster cancel
 ```
+
+`/poster force` принудительно завершает все активные и зависшие сессии плакатов во всех загруженных мирах, удаляет временные сущности и возвращает плакаты на стены. Используйте после перезагрузки скриптов или при сбое анимации.
 
 Права: `marallyzen.poster.use`, административные действия — `marallyzen.poster.admin`.
 
@@ -23,8 +26,11 @@
 /dictaphone remove
 /dictaphone info
 /dictaphone rebuild
+/dictaphone force
 /dictaphone cancel
 ```
+
+`/dictaphone force` останавливает активные воспроизведения и наррации, очищает временные сущности и возвращает все диктофоны на землю.
 
 Короткий алиас: `/dict`.
 
@@ -80,6 +86,8 @@
 
 ## Кат-сцены
 
+Подробная инструкция по записи, актёрам и безопасному воспроизведению находится на странице [«Кат-сцены»](kat-sceny.md).
+
 ```text
 /cutscene record <name> [seconds]
 /cutscene stop
@@ -90,4 +98,4 @@
 /cutscene delete <name>
 ```
 
-Запись идёт с частотой 20 кадров в секунду. `/cutscene stop` сохраняет текущий маршрут, а `Shift` позволяет зрителю досрочно завершить воспроизведение. Максимальная продолжительность одной записи — 300 секунд. Право: `marallyzen.cutscene.admin`.
+Право: `marallyzen.cutscene.admin`.
