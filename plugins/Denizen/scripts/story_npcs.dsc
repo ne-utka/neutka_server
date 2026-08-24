@@ -126,9 +126,16 @@ marallyzen_story_choice_command:
   script:
   - if <context.server>:
     - stop
-  - define session_key <context.args.get[1]||null>
-  - define choice_id <context.args.get[2].to_lowercase||null>
-  - define session <player.flag[marallyzen_story_session]||null>
+  - run marallyzen_story_choice_select def:<player>|<context.args.get[1]||null>|<context.args.get[2].to_lowercase||null>
+
+marallyzen_story_choice_select:
+  type: task
+  debug: false
+  definitions: viewer|session_key|choice_id
+  script:
+  - if !<[viewer].is_online||false>:
+    - stop
+  - define session <[viewer].flag[marallyzen_story_session]||null>
   - if <[session]> == null || <[session].get[key]> != <[session_key]> || <[session].get[awaiting_choice]||false> != true:
     - stop
   - define dialog_id <[session].get[dialog]>
@@ -136,31 +143,44 @@ marallyzen_story_choice_command:
   - define choice <server.flag[marallyzen_story_runtime.dialogs.<[dialog_id]>.nodes.<[node_id]>.choices.<[choice_id]>]||null>
   - if <[choice]> == null:
     - stop
-  - ratelimit <player> 3t
-  - flag player marallyzen_story_session.awaiting_choice:false
-  - flag player marallyzen_story_session.available_choices:!
-  - actionbar "<gray>Вы<&co> <white><[choice].get[text].parse_color>" targets:<player>
+  - ratelimit <[viewer]> 3t
+  - flag <[viewer]> marallyzen_story_session.awaiting_choice:false
+  - flag <[viewer]> marallyzen_story_session.available_choices:!
+  - run marallyzen_story_choice_ui_clear def:<[viewer]>
+  - actionbar "<gray>Вы<&co> <white><[choice].get[text].parse_color>" targets:<[viewer]>
   - wait 10t
-  - if <player.flag[marallyzen_story_session.key]||null> != <[session_key]>:
+  - if <[viewer].flag[marallyzen_story_session.key]||null> != <[session_key]>:
     - stop
   - define next <[choice].get[next]||end>
   - if <[next]> == end:
-    - actionbar "" targets:<player>
-    - flag player marallyzen_story_session:!
+    - actionbar "" targets:<[viewer]>
+    - flag <[viewer]> marallyzen_story_session:!
     - stop
-  - run marallyzen_story_dialog_play_node def:<player>|<[session_key]>|<[dialog_id]>|<[next]>|<[session].get[default_speaker]||Персонаж>
+  - run marallyzen_story_dialog_play_node def:<[viewer]>|<[session_key]>|<[dialog_id]>|<[next]>|<[session].get[default_speaker]||Персонаж>
 
 marallyzen_story_events:
   type: world
   debug: false
   events:
     on server start:
+    - run marallyzen_story_choice_ui_cleanup_all
     - run marallyzen_story_load def:null|true delay:2s
 
     on reload scripts:
     - foreach <server.online_players> as:viewer:
       - run marallyzen_story_session_stop def:<[viewer]>|false
+    - run marallyzen_story_choice_ui_cleanup_all
     - run marallyzen_story_load def:null|true delay:2t
+
+    on player right clicks interaction:
+    - if <context.hand> != mainhand:
+      - stop
+    - define target <context.entity>
+    - define owner <[target].flag[marallyzen_story_choice_owner]||null>
+    - if <[owner]> != <player.uuid>:
+      - stop
+    - determine passively cancelled
+    - run marallyzen_story_choice_select def:<player>|<[target].flag[marallyzen_story_choice_session]||null>|<[target].flag[marallyzen_story_choice_id]||null>
 
     on player right clicks entity:
     - if <context.hand> != mainhand:
@@ -454,6 +474,112 @@ marallyzen_story_npc_info:
   - else:
     - narrate "<gray>NPC ещё не создан в мире." targets:<[actor]>
 
+marallyzen_story_choice_ui_show:
+  type: task
+  debug: false
+  definitions: viewer|session_key|choices
+  script:
+  - if !<[viewer].is_online||false> || <[viewer].flag[marallyzen_story_session.key]||null> != <[session_key]>:
+    - stop
+  - run marallyzen_story_choice_ui_clear def:<[viewer]>
+  - define session <[viewer].flag[marallyzen_story_session]>
+  - define npc_entity <[session].get[npc]||null>
+  - if <[npc_entity]> != null && <[npc_entity].is_spawned||false>:
+    - define anchor <[npc_entity].location.add[0,1.85,0]>
+    - define facing <[anchor].face[<[viewer].eye_location>]>
+    - define side_point <[facing].with_yaw[<[facing].yaw.sub[90]>].forward_flat[1]>
+    - define side_vector <[side_point].sub[<[anchor]>]>
+    - define base <[anchor].add[<[side_vector].mul[1.65]>]>
+  - else:
+    - define base <[viewer].eye_location.forward[3].add[0,0.5,0]>
+  - define ui_entities <list[]>
+  - define interactions <list[]>
+  - foreach <[choices]> key:choice_id as:choice:
+    - define index <[loop_index]>
+    - define label <[choice].get[text].parse_color>
+    - define y_offset <[index].sub[1].mul[-0.34]>
+    - define line_location <[base].add[0,<[y_offset]>,0]>
+    - spawn text_display <[line_location]> save:story_choice_text
+    - define display <entry[story_choice_text].spawned_entity>
+    - adjust <[display]> text:<element[<[index]>. <[label]>].color[white]>
+    - adjust <[display]> pivot:center
+    - adjust <[display]> display:left
+    - adjust <[display]> default_background:false
+    - adjust <[display]> background_color:<color[transparent]>
+    - adjust <[display]> text_shadowed:true
+    - adjust <[display]> see_through:false
+    - adjust <[display]> scale:<location[0.9,0.9,0.9]>
+    - spawn interaction[width=3.4;height=0.34;is_aware=true] <[line_location].add[0,-0.17,0]> save:story_choice_hitbox
+    - define hitbox <entry[story_choice_hitbox].spawned_entity>
+    - flag <[display]> marallyzen_story_choice_ui:true
+    - flag <[hitbox]> marallyzen_story_choice_ui:true
+    - flag <[hitbox]> marallyzen_story_choice_owner:<[viewer].uuid>
+    - flag <[hitbox]> marallyzen_story_choice_session:<[session_key]>
+    - flag <[hitbox]> marallyzen_story_choice_id:<[choice_id]>
+    - flag <[hitbox]> marallyzen_story_choice_index:<[index]>
+    - flag <[hitbox]> marallyzen_story_choice_label:<[label]>
+    - flag <[hitbox]> marallyzen_story_choice_display:<[display]>
+    - adjust <[display]> hide_from_players
+    - adjust <[hitbox]> hide_from_players
+    - adjust <[viewer]> show_entity:<[display]>
+    - adjust <[viewer]> show_entity:<[hitbox]>
+    - define ui_entities:->:<[display]>
+    - define ui_entities:->:<[hitbox]>
+    - define interactions:->:<[hitbox]>
+    - flag server marallyzen_story_choice_ui_entities:->:<[display]>
+    - flag server marallyzen_story_choice_ui_entities:->:<[hitbox]>
+  - flag <[viewer]> marallyzen_story_session.choice_ui:<[ui_entities]>
+  - flag <[viewer]> marallyzen_story_session.choice_interactions:<[interactions]>
+  - flag <[viewer]> marallyzen_story_session.highlighted_choice:null
+  - run marallyzen_story_choice_ui_watch def:<[viewer]>|<[session_key]>
+
+marallyzen_story_choice_ui_watch:
+  type: task
+  debug: false
+  definitions: viewer|session_key
+  script:
+  - while <[viewer].is_online||false> && <[viewer].flag[marallyzen_story_session.key]||null> == <[session_key]> && <[viewer].flag[marallyzen_story_session.awaiting_choice]||false> == true:
+    - define hovered <[viewer].precise_target[8].type[interaction]||null>
+    - if <[hovered]> != null && <[hovered].flag[marallyzen_story_choice_owner]||null> != <[viewer].uuid>:
+      - define hovered null
+    - define previous <[viewer].flag[marallyzen_story_session.highlighted_choice]||null>
+    - if <[hovered]> != <[previous]>:
+      - if <[previous]> != null && <[previous].is_spawned||false>:
+        - define old_display <[previous].flag[marallyzen_story_choice_display]||null>
+        - if <[old_display]> != null && <[old_display].is_spawned||false>:
+          - adjust <[old_display]> text:<element[<[previous].flag[marallyzen_story_choice_index]>. <[previous].flag[marallyzen_story_choice_label]>].color[white]>
+          - adjust <[old_display]> background_color:<color[transparent]>
+      - if <[hovered]> != null && <[hovered].is_spawned||false>:
+        - define new_display <[hovered].flag[marallyzen_story_choice_display]||null>
+        - if <[new_display]> != null && <[new_display].is_spawned||false>:
+          - adjust <[new_display]> text:<element[◀ <[hovered].flag[marallyzen_story_choice_label]>].color[black]>
+          - adjust <[new_display]> background_color:<color[#E9B544]>
+      - flag <[viewer]> marallyzen_story_session.highlighted_choice:<[hovered]>
+    - wait 2t
+
+marallyzen_story_choice_ui_clear:
+  type: task
+  debug: false
+  definitions: viewer
+  script:
+  - define ui_entities <[viewer].flag[marallyzen_story_session.choice_ui]||<list[]>>
+  - foreach <[ui_entities]> as:ui_entity:
+    - if <[ui_entity].is_spawned||false>:
+      - remove <[ui_entity]>
+    - flag server marallyzen_story_choice_ui_entities:<-:<[ui_entity]>
+  - flag <[viewer]> marallyzen_story_session.choice_ui:!
+  - flag <[viewer]> marallyzen_story_session.choice_interactions:!
+  - flag <[viewer]> marallyzen_story_session.highlighted_choice:!
+
+marallyzen_story_choice_ui_cleanup_all:
+  type: task
+  debug: false
+  script:
+  - foreach <server.flag[marallyzen_story_choice_ui_entities]||<list[]>> as:ui_entity:
+    - if <[ui_entity].is_spawned||false>:
+      - remove <[ui_entity]>
+  - flag server marallyzen_story_choice_ui_entities:!
+
 marallyzen_story_dialog_start:
   type: task
   debug: false
@@ -488,12 +614,14 @@ marallyzen_story_dialog_play_node:
   - define node <server.flag[marallyzen_story_runtime.dialogs.<[dialog_id]>.nodes.<[node_id]>]||null>
   - if <[node]> == null:
     - actionbar "<red>Ветка диалога повреждена." targets:<[viewer]>
+    - run marallyzen_story_choice_ui_clear def:<[viewer]>
     - flag <[viewer]> marallyzen_story_session:!
     - stop
   - define transitions <[viewer].flag[marallyzen_story_session.transitions]||0>
   - define transitions <[transitions].add[1]>
   - if <[transitions]> > 64:
     - actionbar "<red>Диалог остановлен: слишком много автоматических переходов." targets:<[viewer]>
+    - run marallyzen_story_choice_ui_clear def:<[viewer]>
     - flag <[viewer]> marallyzen_story_session:!
     - stop
   - flag <[viewer]> marallyzen_story_session.node:<[node_id]>
@@ -535,17 +663,15 @@ marallyzen_story_dialog_play_node:
   - if !<[choices].is_empty>:
     - flag <[viewer]> marallyzen_story_session.awaiting_choice:true
     - flag <[viewer]> marallyzen_story_session.available_choices:<[choices].keys>
-    - actionbar "<gray>Выберите ответ в чате." targets:<[viewer]>
-    - narrate "<gray>Выберите ответ<&co>" targets:<[viewer]>
-    - foreach <[choices]> key:choice_id as:choice:
-      - define button <element[  <gray>[<white><[loop_index]><gray>] <white><[choice].get[text].parse_color>].on_click[/storychoice <[session_key]> <[choice_id]>].on_hover[<gray>Нажмите, чтобы ответить]>
-      - narrate <[button]> targets:<[viewer]>
+    - actionbar "" targets:<[viewer]>
+    - run marallyzen_story_choice_ui_show def:<[viewer]>|<[session_key]>|<[choices]>
     - stop
   - define next <[node].get[next]||end>
   - if <[next]> != end:
     - run marallyzen_story_dialog_play_node def:<[viewer]>|<[session_key]>|<[dialog_id]>|<[next]>|<[default_speaker]>
     - stop
   - actionbar "" targets:<[viewer]>
+  - run marallyzen_story_choice_ui_clear def:<[viewer]>
   - flag <[viewer]> marallyzen_story_session:!
 
 marallyzen_story_session_stop:
@@ -558,6 +684,7 @@ marallyzen_story_session_stop:
     - if <[notify]> == true:
       - actionbar "<gray>Активного диалога нет." targets:<[viewer]>
     - stop
+  - run marallyzen_story_choice_ui_clear def:<[viewer]>
   - define sound_id <[session].get[active_sound]||null>
   - if <[sound_id]> != null:
     - execute as_server "minecraft:stopsound <[viewer].name> voice <[sound_id].parsed>" silent
