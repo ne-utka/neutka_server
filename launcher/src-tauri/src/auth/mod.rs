@@ -389,5 +389,14 @@ async fn api_error(service: &str, response: reqwest::Response) -> String {
                 .and_then(Value::as_str)
                 .map(str::to_owned)
         });
+
+    if detail
+        .as_deref()
+        .is_some_and(|message| message.contains("Invalid app registration"))
+    {
+        return "SpringRP ожидает одобрения Minecraft Services. Авторизация станет доступна после проверки Client ID."
+            .into();
+    }
+
     detail.unwrap_or_else(|| format!("{service} вернул ошибку {status}"))
 }
