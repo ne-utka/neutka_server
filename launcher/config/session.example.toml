@@ -1,0 +1,4 @@
+# Example shape only. Never commit a real session.toml.
+profile_id = "00000000-0000-0000-0000-000000000000"
+player_name = "Player"
+access_token = "runtime-secret"

@@ -1,0 +1,63 @@
+:root {
+  color: #fff;
+  background: #171717;
+  font-family: "Inter Variable", Inter, system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --window: #171717;
+  --title-bar: #0b0b0b;
+  --accent: rgb(29 114 242);
+  --accent-hover: rgb(23 91 194);
+  --surface: #404040;
+  --muted: #a3a3a3;
+  --subtle: #565656;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--window);
+}
+
+button,
+input,
+select {
+  color: inherit;
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  flex-direction: column;
+  background: var(--window);
+}
+
+.app-content {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+}

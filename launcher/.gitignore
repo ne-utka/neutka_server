@@ -1,0 +1,16 @@
+node_modules/
+dist/
+target/
+src-tauri/target/
+.idea/
+.vscode/
+*.log
+
+# Runtime state may contain account data.
+config/prefs.toml
+config/session.toml
+
+# Supplied separately for packaged builds.
+resources/NewLaunch.jar
+resources/skins/*
+!resources/skins/.gitkeep
