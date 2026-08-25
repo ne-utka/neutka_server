@@ -55,11 +55,22 @@ function closeMicrosoftStatus(): void {
         Авторизация на сайте
       </button>
       <button
+        class="microsoft-auth-button"
         type="button"
         :disabled="microsoftLoading"
         @click="authorizeMicrosoft"
       >
-        Авторизация Microsoft
+        <svg
+          class="microsoft-logo"
+          viewBox="0 0 21 21"
+          aria-hidden="true"
+        >
+          <rect width="10" height="10" fill="#f25022" />
+          <rect x="11" width="10" height="10" fill="#7fba00" />
+          <rect y="11" width="10" height="10" fill="#00a4ef" />
+          <rect x="11" y="11" width="10" height="10" fill="#ffb900" />
+        </svg>
+        <span>Авторизация Microsoft</span>
       </button>
     </div>
 
@@ -143,6 +154,19 @@ function closeMicrosoftStatus(): void {
   background: var(--accent);
   font-size: 18px;
   font-weight: 600;
+}
+
+.oauth-actions .microsoft-auth-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+}
+
+.microsoft-logo {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 21px;
 }
 
 .oauth-actions button:not(:disabled):hover,
