@@ -1,0 +1,23 @@
+{
+  "version": "26.1.2",
+  "game": {
+    "file": "fabric-26.1.2.zip",
+    "sha256": "e4d8a82b56831b15d08d72da242f997253a3a8da7bc5be7b2591c8e107a09865",
+    "size": 133541180
+  },
+  "modsDirectory": "mods",
+  "minecraft": {
+    "version": "26.1.2",
+    "fabricLoader": "0.19.3"
+  },
+  "optionalMods": [
+    {
+      "id": "chatpatches",
+      "name": "Chat Patches",
+      "file": "optional/chatpatches-8.0-alpha.11+26.1.2-fabric.jar",
+      "sha256": "1909df5fe87fec9728bf887d2db1bd8b05c3761a44707d0a59c244ed0535c519",
+      "size": 1487606,
+      "defaultEnabled": false
+    }
+  ]
+}

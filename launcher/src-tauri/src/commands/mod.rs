@@ -5,9 +5,8 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::{
     application::ArchitectureService,
-    auth::{
-        self, AuthState, AuthenticatedProfile, DeviceCodeChallenge,
-    },
+    auth::{self, AuthState, AuthenticatedProfile, DeviceCodeChallenge},
+    distribution::{self, DistributionStatus, PlayResult},
     domain::ArchitectureStatus,
 };
 
@@ -59,4 +58,64 @@ pub fn get_authenticated_profile(
 #[tauri::command]
 pub fn sign_out_microsoft(state: State<'_, AuthState>) -> Result<(), String> {
     state.clear()
+}
+
+#[tauri::command]
+pub async fn get_distribution_status(app: AppHandle) -> DistributionStatus {
+    distribution::status(&app).await
+}
+
+#[tauri::command]
+pub fn set_optional_mods(app: AppHandle, ids: Vec<String>) -> Result<(), String> {
+    let store = distribution::store(&app)?;
+    let mut preferences = store
+        .load_preferences()
+        .map_err(|error| error.to_string())?;
+    preferences.optional_mod_ids = Some(ids);
+    store
+        .save_preferences(&preferences)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn set_memory_gb(app: AppHandle, memory_gb: u32) -> Result<(), String> {
+    let profile = crate::jvm::profile();
+    if !profile.allows(memory_gb) {
+        return Err(format!(
+            "Доступно не больше {} ГБ: в системе {} ГБ",
+            profile.options.last().copied().unwrap_or(2),
+            profile.total_gb
+        ));
+    }
+
+    let store = distribution::store(&app)?;
+    let mut preferences = store
+        .load_preferences()
+        .map_err(|error| error.to_string())?;
+    preferences.max_memory_mb = memory_gb * 1024;
+    preferences.min_memory_mb = preferences.max_memory_mb;
+    store
+        .save_preferences(&preferences)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn play_game(
+    app: AppHandle,
+    nickname: String,
+    state: State<'_, AuthState>,
+) -> Result<PlayResult, String> {
+    let identity = state.launch_identity(&nickname)?;
+    let store = distribution::store(&app)?;
+    let mut preferences = store
+        .load_preferences()
+        .map_err(|error| error.to_string())?;
+    let result = distribution::play(&app, identity, &mut preferences).await?;
+    let _ = store.save_preferences(&preferences);
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn open_game_folder(app: AppHandle) -> Result<(), String> {
+    distribution::open_game_folder(&app)
 }

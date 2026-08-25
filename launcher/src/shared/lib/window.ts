@@ -4,7 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 export type AppScreen = "home" | "auth" | "settings";
 
 const SCREEN_SIZES: Record<AppScreen, readonly [number, number]> = {
-  home: [456, 395],
+  home: [456, 430],
   auth: [456, 547],
   settings: [528, 679],
 };

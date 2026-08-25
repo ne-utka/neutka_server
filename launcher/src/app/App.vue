@@ -13,8 +13,8 @@ import {
 } from "@/shared/lib/window";
 import AppHeader from "@/widgets/AppHeader.vue";
 
-const screen = ref<AppScreen>("home");
-const nickname = ref("123");
+const screen = ref<AppScreen>("auth");
+const nickname = ref("");
 const authorized = ref(false);
 
 watch(

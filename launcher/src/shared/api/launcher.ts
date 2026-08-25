@@ -1,5 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ArchitectureStatus } from "@/entities/launcher/model";
+import type {
+  ArchitectureStatus,
+  DistributionStatus,
+  PlayResult,
+} from "@/entities/launcher/model";
 
 export interface DeviceCodeChallenge {
   deviceCode: string;
@@ -43,4 +47,24 @@ export function getAuthenticatedProfile(): Promise<AuthenticatedProfile | null> 
 
 export function signOutMicrosoft(): Promise<void> {
   return invoke("sign_out_microsoft");
+}
+
+export function getDistributionStatus(): Promise<DistributionStatus> {
+  return invoke<DistributionStatus>("get_distribution_status");
+}
+
+export function setOptionalMods(ids: string[]): Promise<void> {
+  return invoke("set_optional_mods", { ids });
+}
+
+export function setMemoryGb(memoryGb: number): Promise<void> {
+  return invoke("set_memory_gb", { memoryGb });
+}
+
+export function playGame(nickname: string): Promise<PlayResult> {
+  return invoke<PlayResult>("play_game", { nickname });
+}
+
+export function openGameFolder(): Promise<void> {
+  return invoke("open_game_folder");
 }

@@ -1,9 +1,9 @@
 export interface LaunchCapability {
-  enabled: false;
-  reason: "architecture-only";
+  enabled: true;
+  reason: "http-distribution";
 }
 
 export const launchCapability: LaunchCapability = {
-  enabled: false,
-  reason: "architecture-only",
+  enabled: true,
+  reason: "http-distribution",
 };

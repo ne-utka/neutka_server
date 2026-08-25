@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import launcherIcon from "@/shared/assets/launcher-icon.png";
 import type { AppScreen } from "@/shared/lib/window";
 import { closeWindow, minimizeWindow } from "@/shared/lib/window";
@@ -6,6 +7,16 @@ import AppIcon from "@/shared/ui/AppIcon.vue";
 
 const props = defineProps<{ screen: AppScreen }>();
 const emit = defineEmits<{ back: [] }>();
+
+const closesScreen = computed(() => props.screen === "settings");
+
+function dismiss(): void {
+  if (closesScreen.value) {
+    emit("back");
+    return;
+  }
+  void closeWindow();
+}
 </script>
 
 <template>
@@ -30,10 +41,10 @@ const emit = defineEmits<{ back: [] }>();
         <AppIcon name="minimize" :size="16" />
       </button>
       <button
-        class="close-control"
+        :class="{ 'close-control': !closesScreen }"
         type="button"
-        aria-label="Закрыть"
-        @click="closeWindow"
+        :aria-label="closesScreen ? 'Вернуться на главный экран' : 'Закрыть'"
+        @click="dismiss"
       >
         <AppIcon name="close" :size="16" />
       </button>

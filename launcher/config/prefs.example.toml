@@ -1,4 +1,12 @@
 locale = "ru-RU"
-java_path = "C:\\Program Files\\Java\\jdk-21\\bin\\java.exe"
-min_memory_mb = 1024
-max_memory_mb = 4096
+
+# Необязательно: своя Java вместо той, что лаунчер скачивает у Mojang.
+java_path = "C:\\Program Files\\Java\\jdk-25\\bin\\java.exe"
+
+# До первого изменения в настройках объём подбирается по ОЗУ машины.
+# Начальный размер кучи равен максимальному: иначе она растёт во время игры.
+min_memory_mb = 6144
+max_memory_mb = 6144
+
+distribution_base_url = "https://springrp.ru/launcher/game"
+optional_mod_ids = []

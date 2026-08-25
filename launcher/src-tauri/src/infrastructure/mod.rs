@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     config::{ConfigError, Preferences, Session},
@@ -20,10 +20,42 @@ impl TomlConfigStore {
         Self { app_data_dir }
     }
 
+    pub fn app_data_dir(&self) -> &Path {
+        &self.app_data_dir
+    }
+
+    pub fn game_dir(&self) -> PathBuf {
+        self.app_data_dir.join("game")
+    }
+
+    pub fn cache_dir(&self) -> PathBuf {
+        self.app_data_dir.join("cache")
+    }
+
+    /// Vanilla client, libraries, assets and the bundled Java runtime.
+    pub fn minecraft_dir(&self) -> PathBuf {
+        self.app_data_dir.join("minecraft")
+    }
+
     pub fn load_preferences(&self) -> Result<Preferences, ConfigError> {
-        let preferences: Preferences = self.read_toml("prefs.toml")?;
+        match self.read_toml("prefs.toml") {
+            Ok(preferences) => {
+                let preferences: Preferences = preferences;
+                preferences.validate()?;
+                Ok(preferences)
+            }
+            Err(ConfigError::Read(error))
+                if error.kind() == std::io::ErrorKind::NotFound =>
+            {
+                Ok(Preferences::default())
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    pub fn save_preferences(&self, preferences: &Preferences) -> Result<(), ConfigError> {
         preferences.validate()?;
-        Ok(preferences)
+        self.write_toml("prefs.toml", preferences)
     }
 
     pub fn load_session(&self) -> Result<Session, ConfigError> {
@@ -34,6 +66,12 @@ impl TomlConfigStore {
         let contents =
             fs::read_to_string(self.app_data_dir.join(name)).map_err(ConfigError::Read)?;
         toml::from_str(&contents).map_err(ConfigError::Parse)
+    }
+
+    fn write_toml<T: Serialize>(&self, name: &str, value: &T) -> Result<(), ConfigError> {
+        fs::create_dir_all(&self.app_data_dir).map_err(ConfigError::Write)?;
+        let contents = toml::to_string_pretty(value).map_err(ConfigError::Serialize)?;
+        fs::write(self.app_data_dir.join(name), contents).map_err(ConfigError::Write)
     }
 }
 

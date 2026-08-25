@@ -13,3 +13,38 @@ export interface LaunchReceipt {
   processId: number;
   startedAt: string;
 }
+
+export interface OptionalMod {
+  id: string;
+  name: string;
+  file: string;
+  sha256: string;
+  size: number;
+  defaultEnabled: boolean;
+}
+
+export interface DistributionStatus {
+  baseUrl: string;
+  remoteVersion: string | null;
+  installedVersion: string | null;
+  needsDownload: boolean;
+  optionalMods: OptionalMod[];
+  enabledOptionalModIds: string[];
+  memoryGb: number;
+  memoryOptions: number[];
+  totalMemoryGb: number;
+  recommendedMemoryGb: number;
+  error: string | null;
+}
+
+export interface DownloadProgress {
+  phase: string;
+  label: string;
+  received: number;
+  total: number;
+}
+
+export interface PlayResult {
+  installedVersion: string;
+  launched: boolean;
+}

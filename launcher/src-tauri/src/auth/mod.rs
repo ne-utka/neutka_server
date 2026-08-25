@@ -38,8 +38,15 @@ pub struct AuthState {
 
 struct AuthSession {
     profile: AuthenticatedProfile,
-    _minecraft_access_token: String,
+    minecraft_access_token: String,
     _microsoft_refresh_token: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LaunchIdentity {
+    pub name: String,
+    pub uuid: String,
+    pub access_token: String,
 }
 
 impl AuthState {
@@ -51,7 +58,7 @@ impl AuthState {
     ) -> Result<(), String> {
         let session = AuthSession {
             profile,
-            _minecraft_access_token: minecraft_access_token,
+            minecraft_access_token,
             _microsoft_refresh_token: microsoft_refresh_token,
         };
         *self
@@ -79,6 +86,47 @@ impl AuthState {
             .as_ref()
             .map(|session| session.profile.clone()))
     }
+
+    pub fn launch_identity(&self, nickname: &str) -> Result<LaunchIdentity, String> {
+        let session = self
+            .session
+            .lock()
+            .map_err(|_| "Не удалось прочитать сессию авторизации".to_string())?;
+
+        if let Some(session) = session.as_ref() {
+            return Ok(LaunchIdentity {
+                name: session.profile.name.clone(),
+                uuid: hyphenate_uuid(&session.profile.id),
+                access_token: session.minecraft_access_token.clone(),
+            });
+        }
+
+        let name = nickname.trim();
+        if name.is_empty() {
+            return Err("Сначала введите ник или авторизуйтесь".into());
+        }
+
+        Ok(LaunchIdentity {
+            name: name.to_string(),
+            uuid: "00000000-0000-0000-0000-000000000000".into(),
+            access_token: "0".into(),
+        })
+    }
+}
+
+fn hyphenate_uuid(value: &str) -> String {
+    let compact: String = value.chars().filter(|ch| *ch != '-').collect();
+    if compact.len() != 32 {
+        return value.to_string();
+    }
+    format!(
+        "{}-{}-{}-{}-{}",
+        &compact[0..8],
+        &compact[8..12],
+        &compact[12..16],
+        &compact[16..20],
+        &compact[20..32]
+    )
 }
 
 #[derive(Deserialize)]

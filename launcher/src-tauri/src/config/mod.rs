@@ -18,15 +18,23 @@ pub struct Preferences {
     pub java_path: Option<String>,
     pub min_memory_mb: u32,
     pub max_memory_mb: u32,
+    pub distribution_base_url: String,
+    /// `None` — игрок ещё не открывал список и получает моды по умолчанию.
+    /// Пустой список — осознанный выбор не ставить ничего.
+    pub optional_mod_ids: Option<Vec<String>>,
 }
 
 impl Default for Preferences {
     fn default() -> Self {
+        // До первого сохранения память подбирается по объёму ОЗУ машины.
+        let memory_mb = crate::jvm::profile().recommended_gb * 1024;
         Self {
             locale: "ru-RU".into(),
             java_path: None,
-            min_memory_mb: 1024,
-            max_memory_mb: 4096,
+            min_memory_mb: memory_mb,
+            max_memory_mb: memory_mb,
+            distribution_base_url: "https://springrp.ru/launcher/game".into(),
+            optional_mod_ids: None,
         }
     }
 }
@@ -55,6 +63,10 @@ pub enum ConfigError {
     Read(#[source] std::io::Error),
     #[error("configuration is not valid TOML")]
     Parse(#[source] toml::de::Error),
+    #[error("configuration file could not be written")]
+    Write(#[source] std::io::Error),
+    #[error("configuration could not be serialized")]
+    Serialize(#[source] toml::ser::Error),
     #[error("configuration is invalid: {0}")]
     Validation(String),
 }
