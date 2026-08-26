@@ -41,6 +41,10 @@ the resulting authorization through Xbox Live, XSTS and Minecraft Services. The
 final profile request returns only the Minecraft player ID and name used by the
 UI.
 
+Game startup requires this authenticated profile. The launcher never fabricates
+an offline UUID or access token because the SpringRP server uses authenticated
+online-mode sessions.
+
 Tokens never cross the Tauri IPC boundary. `AuthState` retains the Minecraft
 access token, optional Microsoft refresh token and authenticated profile only
 in native process memory. The launch pipeline reads the Minecraft access token
@@ -96,6 +100,10 @@ Pressing "Играть" runs one command that reports progress over the
 4. Arguments are built from both metadata files: platform rules decide which
    libraries and flags apply, feature-gated arguments are always skipped, and
    Fabric libraries shadow the vanilla ones of the same artifact.
+5. On Windows, the Java process receives a short
+   `jdk.net.unixdomain.tmpdir`. This prevents modern JDK NIO selectors from
+   exceeding the Windows AF_UNIX path limit while leaving ordinary temporary
+   files in the user's standard temporary directory.
 
 Every downloaded file is verified against the SHA-1 published in the metadata,
 written to a temporary name and only then moved into place. Files already on

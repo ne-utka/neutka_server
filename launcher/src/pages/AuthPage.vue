@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { ref } from "vue";
 import {
   completeMicrosoftAuth,
   startMicrosoftAuth,
@@ -13,7 +13,6 @@ import {
 const emit = defineEmits<{
   complete: [nickname: string, authorized: boolean];
 }>();
-const nickname = ref("");
 const microsoftLoading = ref(false);
 const microsoftStatusVisible = ref(false);
 const challenge = ref<DeviceCodeChallenge | null>(null);
@@ -21,12 +20,6 @@ const oauthError = ref<string | null>(null);
 const codeCopied = ref(false);
 let microsoftAttempt = 0;
 let copiedReset: ReturnType<typeof setTimeout> | null = null;
-
-const isValid = computed(() => /^[A-Za-z0-9_]{3,16}$/.test(nickname.value));
-
-function continueWithNickname(): void {
-  if (isValid.value) emit("complete", nickname.value, false);
-}
 
 async function authorizeMicrosoft(): Promise<void> {
   if (microsoftLoading.value) return;
@@ -126,29 +119,9 @@ async function copyMicrosoftCode(): Promise<void> {
       </button>
     </div>
 
-    <div class="divider" aria-hidden="true">
-      <span />
-      <p>или</p>
-      <span />
-    </div>
-
-    <form @submit.prevent="continueWithNickname">
-      <input
-        v-model="nickname"
-        type="text"
-        inputmode="text"
-        maxlength="16"
-        autocomplete="username"
-        placeholder="Введите ник"
-        aria-describedby="nickname-hint"
-      />
-      <p id="nickname-hint" class="hint">
-        Латиница, от 3 до 16 символов
-      </p>
-      <button class="continue-button" type="submit" :disabled="!isValid">
-        Продолжить
-      </button>
-    </form>
+    <p class="auth-hint">
+      Для подключения к серверу требуется аккаунт с приобретённой Minecraft: Java Edition.
+    </p>
 
     <div
       v-if="microsoftStatusVisible"
@@ -215,8 +188,7 @@ async function copyMicrosoftCode(): Promise<void> {
   font-weight: 600;
 }
 
-.oauth-actions button:not(:disabled):hover,
-.continue-button:not(:disabled):hover {
+.oauth-actions button:not(:disabled):hover {
   background: var(--accent-hover);
 }
 
@@ -245,79 +217,13 @@ async function copyMicrosoftCode(): Promise<void> {
   opacity: 1;
 }
 
-.divider {
-  display: grid;
-  align-items: center;
-  margin: 20px 0 16px;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 16px;
-}
-
-.divider span {
-  height: 2px;
-  background: #404040;
-}
-
-.divider p {
-  margin: 0;
-  color: #565656;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 18px;
-}
-
-form {
-  margin: 0;
-}
-
-input {
-  width: 376px;
-  height: 56px;
-  padding: 0 19px;
-  color: #fff;
-  border: 1px solid #404040;
-  border-radius: 8px;
-  background: transparent;
-  caret-color: var(--accent);
-  font-size: 16px;
-  font-weight: 400;
-}
-
-input::placeholder {
-  color: #696969;
-  opacity: 1;
-}
-
-input:focus {
-  border-color: #525252;
-  outline: none;
-}
-
-.hint {
-  margin: 6px 0 0;
-  color: #565656;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 15px;
-}
-
-.continue-button {
-  width: 376px;
-  height: 64px;
-  margin-top: 16px;
-  padding: 0;
-  color: #fff;
-  border: 0;
-  border-radius: 8px;
-  background: var(--accent);
-  font-size: 17px;
+.auth-hint {
+  margin: 18px 8px 0;
+  color: #737373;
+  font-size: 13px;
   font-weight: 600;
-}
-
-.continue-button:disabled {
-  color: #505050;
-  background: #2b2b2b;
-  cursor: default;
+  line-height: 18px;
+  text-align: center;
 }
 
 .microsoft-status {

@@ -18,10 +18,9 @@ During Microsoft authentication, the launcher receives and temporarily handles:
 The launcher does not request the user's Microsoft password. Authentication is
 completed on Microsoft's own website through the OAuth 2.0 device-code flow.
 
-If the user chooses manual nickname mode instead, the entered nickname is used
-in the local launcher interface and is not sent to Microsoft by the launcher.
-The nickname is sent to `mc-heads.net` to request the avatar shown on the home
-screen.
+The authenticated Minecraft player name is sent to `mc-heads.net` to request
+the avatar shown on the home screen. The launcher does not provide an offline
+or manual-nickname login mode for the protected SpringRP server.
 
 ## Purpose and legal basis
 
@@ -82,7 +81,6 @@ flow intended for public clients.
 
 Users may:
 
-- choose manual nickname mode instead of Microsoft authentication;
 - cancel the Microsoft consent flow before completing it;
 - select sign out to clear the active in-memory launcher session;
 - revoke previously granted SpringRP access from their Microsoft account;

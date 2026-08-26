@@ -87,7 +87,7 @@ impl AuthState {
             .map(|session| session.profile.clone()))
     }
 
-    pub fn launch_identity(&self, nickname: &str) -> Result<LaunchIdentity, String> {
+    pub fn launch_identity(&self, _nickname: &str) -> Result<LaunchIdentity, String> {
         let session = self
             .session
             .lock()
@@ -101,16 +101,10 @@ impl AuthState {
             });
         }
 
-        let name = nickname.trim();
-        if name.is_empty() {
-            return Err("Сначала введите ник или авторизуйтесь".into());
-        }
-
-        Ok(LaunchIdentity {
-            name: name.to_string(),
-            uuid: "00000000-0000-0000-0000-000000000000".into(),
-            access_token: "0".into(),
-        })
+        Err(
+            "Для запуска SpringRP требуется авторизация Microsoft. Вернитесь на экран входа и войдите в аккаунт с приобретённой Minecraft: Java Edition."
+                .into(),
+        )
     }
 }
 
@@ -421,6 +415,38 @@ async fn load_minecraft_profile(
 
 fn network_error(_: reqwest::Error) -> String {
     "Нет соединения с сервисами Microsoft".into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn launch_without_microsoft_session_is_rejected() {
+        let state = AuthState::default();
+        let error = state.launch_identity("OfflineName").unwrap_err();
+        assert!(error.contains("авторизация Microsoft"));
+    }
+
+    #[test]
+    fn launch_uses_the_authenticated_minecraft_identity() {
+        let state = AuthState::default();
+        state
+            .replace(
+                AuthenticatedProfile {
+                    id: "123456781234123412341234567890ab".into(),
+                    name: "SpringPlayer".into(),
+                },
+                "minecraft-token".into(),
+                None,
+            )
+            .unwrap();
+
+        let identity = state.launch_identity("IgnoredName").unwrap();
+        assert_eq!(identity.name, "SpringPlayer");
+        assert_eq!(identity.uuid, "12345678-1234-1234-1234-1234567890ab");
+        assert_eq!(identity.access_token, "minecraft-token");
+    }
 }
 
 async fn api_error(service: &str, response: reqwest::Response) -> String {

@@ -437,6 +437,7 @@ async fn launch_game(
 
     emit(app, "launch", format!("Запуск {}", plan.version_name), 0, 0);
     let mut command = Command::new(&plan.java);
+    configure_windows_java_selector(&mut command)?;
     command.current_dir(&plan.game_dir).args(&plan.arguments);
     crate::vanilla::hide_console(&mut command);
     command
@@ -474,11 +475,42 @@ fn launch_custom_jar(
         args.push(replace_placeholders(arg, preferences, identity));
     }
 
-    Command::new(java)
+    let mut command = Command::new(java);
+    configure_windows_java_selector(&mut command)?;
+    command
         .current_dir(&working_directory)
         .args(&args)
         .spawn()
         .map_err(|error| format!("Не удалось запустить игру: {error}"))
+}
+
+/// Modern Java uses an AF_UNIX socket to wake its Windows NIO selector. The
+/// socket name is derived from the temporary directory and fails with WSAEINVAL
+/// when that path is too long. Keep only this internal socket in a short path;
+/// regular application temporary files continue to use the user's TEMP.
+#[cfg(windows)]
+fn configure_windows_java_selector(command: &mut Command) -> Result<(), String> {
+    let system_drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into());
+    let selector_dir = PathBuf::from(format!(
+        "{}\\srtmp",
+        system_drive.trim_end_matches(['\\', '/'])
+    ));
+    fs::create_dir_all(&selector_dir).map_err(|error| {
+        format!(
+            "Не удалось подготовить временную папку Java {}: {error}",
+            selector_dir.display()
+        )
+    })?;
+    command.arg(format!(
+        "-Djdk.net.unixdomain.tmpdir={}",
+        selector_dir.display()
+    ));
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn configure_windows_java_selector(_: &mut Command) -> Result<(), String> {
+    Ok(())
 }
 
 fn resolve_java(preferences: &Preferences) -> Result<PathBuf, String> {

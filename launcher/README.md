@@ -3,9 +3,9 @@
 SpringRP Launcher is a Windows desktop launcher for the SpringRP Minecraft
 project. It is built with Tauri 2, Vue 3, TypeScript, Vite, Rust and WebView2.
 
-The current version provides Microsoft account authentication and a local
-launcher interface. Minecraft installation, updating and game process startup
-are not enabled yet: the **Play** button is currently a UI placeholder.
+The current version authenticates a Minecraft account, installs and updates the
+SpringRP client distribution, downloads the matching Mojang runtime and starts
+the Fabric game process from the local launcher interface.
 
 ## Microsoft authentication
 
@@ -46,14 +46,16 @@ See the [Privacy Policy](PRIVACY.md) for the complete data-handling statement.
 - validation that the account has a Minecraft: Java Edition profile;
 - display of the Minecraft player name and an avatar fetched from
   `mc-heads.net`;
-- manual nickname mode that does not contact Microsoft;
 - local sign-out that clears the active authentication session;
-- launcher home and settings interface.
+- launcher home and settings interface;
+- installation and updating of the SpringRP modpack;
+- installation of the official Minecraft client, assets, libraries and Java
+  runtime;
+- authenticated game startup using the Minecraft profile returned by
+  Microsoft Services.
 
 Not implemented in the current build:
 
-- downloading or updating Minecraft;
-- starting Java or the Minecraft process;
 - connecting the disabled website-authentication button;
 - persistent Microsoft sessions between launcher restarts;
 - analytics, advertising or telemetry.
