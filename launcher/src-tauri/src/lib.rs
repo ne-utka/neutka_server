@@ -7,6 +7,7 @@ pub mod domain;
 pub mod infrastructure;
 pub mod jvm;
 pub mod launcher;
+pub mod launch_state;
 pub mod vanilla;
 
 use tauri::Manager;
@@ -16,6 +17,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(auth::AuthState::default())
+        .manage(launch_state::LaunchState::default())
         .setup(|app| {
             let icon =
                 tauri::image::Image::from_bytes(include_bytes!("../icons/icon.png"))?;
@@ -33,6 +35,7 @@ pub fn run() {
             commands::get_distribution_status,
             commands::set_optional_mods,
             commands::set_memory_gb,
+            commands::get_launch_status,
             commands::play_game,
             commands::open_game_folder
         ])

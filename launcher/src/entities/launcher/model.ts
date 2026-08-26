@@ -44,6 +44,11 @@ export interface DownloadProgress {
   total: number;
 }
 
+export interface LaunchStatus {
+  busy: boolean;
+  gameRunning: boolean;
+}
+
 export interface PlayResult {
   installedVersion: string;
   launched: boolean;

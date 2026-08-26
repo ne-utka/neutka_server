@@ -1,114 +1,61 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { computed, ref } from "vue";
 import type { DownloadProgress } from "@/entities/launcher/model";
-import {
-  getDistributionStatus,
-  openGameFolder,
-  playGame,
-} from "@/shared/api/launcher";
+import { openGameFolder } from "@/shared/api/launcher";
 import AppIcon from "@/shared/ui/AppIcon.vue";
 import PlayerAvatar from "@/shared/ui/PlayerAvatar.vue";
 
-const props = defineProps<{ nickname: string; authorized: boolean }>();
-defineEmits<{ logout: []; settings: [] }>();
+const props = defineProps<{
+  nickname: string;
+  authorized: boolean;
+  busy: boolean;
+  gameRunning: boolean;
+  needsDownload: boolean;
+  remoteVersion: string | null;
+  progress: DownloadProgress | null;
+  error: string | null;
+  notice: string | null;
+}>();
+defineEmits<{ play: []; logout: []; settings: [] }>();
 
-const busy = ref(false);
-const needsDownload = ref(false);
-const remoteVersion = ref<string | null>(null);
-const progress = ref<DownloadProgress | null>(null);
-const error = ref<string | null>(null);
-const notice = ref<string | null>(null);
-
-let unlisten: UnlistenFn | null = null;
+const folderError = ref<string | null>(null);
+const displayError = computed(() => folderError.value ?? props.error);
 
 const playLabel = computed(() => {
-  if (busy.value && progress.value) {
-    if (progress.value.total > 0) {
+  if (props.gameRunning) return "Игра запущена";
+  if (props.busy && props.progress) {
+    if (props.progress.total > 0) {
       const percent = Math.min(
         99,
-        Math.round((progress.value.received / progress.value.total) * 100),
+        Math.round((props.progress.received / props.progress.total) * 100),
       );
       return `${percent}%`;
     }
-    return progress.value.label;
+    return props.progress.label;
   }
-  if (busy.value) return "Подготовка…";
-  if (needsDownload.value) {
-    return remoteVersion.value
-      ? `Загрузить ${remoteVersion.value}`
+  if (props.busy) return "Подготовка…";
+  if (props.needsDownload) {
+    return props.remoteVersion
+      ? `Загрузить ${props.remoteVersion}`
       : "Загрузить";
   }
   return "Играть";
 });
 
 const percent = computed(() => {
-  if (!progress.value || progress.value.total <= 0) return 0;
+  if (!props.progress || props.progress.total <= 0) return 0;
   return Math.min(
     100,
-    Math.round((progress.value.received / progress.value.total) * 100),
+    Math.round((props.progress.received / props.progress.total) * 100),
   );
 });
-
-onMounted(async () => {
-  await refreshStatus();
-  try {
-    unlisten = await listen<DownloadProgress>("download-progress", (event) => {
-      progress.value = event.payload;
-    });
-  } catch {
-    // Browser-only preview has no Tauri event bus.
-  }
-});
-
-onUnmounted(() => {
-  void unlisten?.();
-});
-
-async function refreshStatus(): Promise<void> {
-  try {
-    const status = await getDistributionStatus();
-    needsDownload.value = status.needsDownload;
-    remoteVersion.value = status.remoteVersion;
-    if (status.error && !status.remoteVersion) {
-      error.value = status.error;
-    }
-  } catch {
-    // Preview without IPC.
-  }
-}
-
-async function play(): Promise<void> {
-  if (busy.value) return;
-  busy.value = true;
-  error.value = null;
-  notice.value = null;
-  progress.value = {
-    phase: "manifest",
-    label: "Подключение к серверу…",
-    received: 0,
-    total: 0,
-  };
-
-  try {
-    const result = await playGame(props.nickname);
-    needsDownload.value = false;
-    remoteVersion.value = result.installedVersion;
-    notice.value = result.launched ? "Игра запущена" : "Сборка установлена";
-  } catch (caught) {
-    error.value =
-      typeof caught === "string" ? caught : "Не удалось подготовить игру";
-  } finally {
-    busy.value = false;
-    progress.value = null;
-  }
-}
 
 async function openFolder(): Promise<void> {
   try {
     await openGameFolder();
+    folderError.value = null;
   } catch (caught) {
-    error.value =
+    folderError.value =
       typeof caught === "string" ? caught : "Не удалось открыть папку";
   }
 }
@@ -136,14 +83,14 @@ async function openFolder(): Promise<void> {
       class="play-button"
       type="button"
       :disabled="busy"
-      @click="play"
+      @click="$emit('play')"
     >
       {{ playLabel }}
     </button>
-    <div v-if="busy" class="progress-track" aria-hidden="true">
+    <div v-if="busy && !gameRunning" class="progress-track" aria-hidden="true">
       <span :style="{ width: `${percent}%` }" />
     </div>
-    <p v-if="error" class="status-copy error">{{ error }}</p>
+    <p v-if="displayError" class="status-copy error">{{ displayError }}</p>
     <p v-else-if="notice" class="status-copy">{{ notice }}</p>
     <p v-else-if="progress" class="status-copy">{{ progress.label }}</p>
 

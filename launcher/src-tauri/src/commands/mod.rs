@@ -8,6 +8,7 @@ use crate::{
     auth::{self, AuthState, AuthenticatedProfile, DeviceCodeChallenge},
     distribution::{self, DistributionStatus, PlayResult},
     domain::ArchitectureStatus,
+    launch_state::{LaunchState, LaunchStatus},
 };
 
 #[tauri::command]
@@ -100,18 +101,27 @@ pub fn set_memory_gb(app: AppHandle, memory_gb: u32) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn get_launch_status(state: State<'_, LaunchState>) -> LaunchStatus {
+    state.status()
+}
+
+#[tauri::command]
 pub async fn play_game(
     app: AppHandle,
     nickname: String,
-    state: State<'_, AuthState>,
+    auth_state: State<'_, AuthState>,
+    launch_state: State<'_, LaunchState>,
 ) -> Result<PlayResult, String> {
-    let identity = state.launch_identity(&nickname)?;
+    let permit = launch_state.try_acquire(app.clone())?;
+    let identity = auth_state.launch_identity(&nickname)?;
     let store = distribution::store(&app)?;
     let mut preferences = store
         .load_preferences()
         .map_err(|error| error.to_string())?;
-    let result = distribution::play(&app, identity, &mut preferences).await?;
+    let (result, child) =
+        distribution::play(&app, identity, &mut preferences).await?;
     let _ = store.save_preferences(&preferences);
+    permit.track_game(child);
     Ok(result)
 }
 

@@ -2,7 +2,7 @@ use std::{
     fs::{self, File},
     io::{self, Write},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Child, Command},
 };
 
 use futures_util::StreamExt;
@@ -210,7 +210,7 @@ pub async fn play(
     app: &AppHandle,
     identity: LaunchIdentity,
     preferences: &mut Preferences,
-) -> Result<PlayResult, String> {
+) -> Result<(PlayResult, Child), String> {
     let store = store(app)?;
     fs::create_dir_all(store.game_dir()).map_err(io_error)?;
     fs::create_dir_all(store.cache_dir()).map_err(io_error)?;
@@ -260,12 +260,15 @@ pub async fn play(
     }
 
     sync_optional_mods(app, &store, &manifest, preferences, &enabled_ids).await?;
-    let launched = launch_game(app, &store, &manifest, preferences, &identity).await?;
+    let child = launch_game(app, &store, &manifest, preferences, &identity).await?;
 
-    Ok(PlayResult {
-        installed_version: manifest.version,
-        launched,
-    })
+    Ok((
+        PlayResult {
+            installed_version: manifest.version,
+            launched: true,
+        },
+        child,
+    ))
 }
 
 /// Список включённых модов: сохранённый выбор игрока, а если его ещё нет —
@@ -349,7 +352,7 @@ async fn launch_game(
     manifest: &DistributionManifest,
     preferences: &Preferences,
     identity: &LaunchIdentity,
-) -> Result<bool, String> {
+) -> Result<Child, String> {
     if let Some(spec) = manifest
         .launch
         .as_ref()
@@ -408,8 +411,7 @@ async fn launch_game(
     crate::vanilla::hide_console(&mut command);
     command
         .spawn()
-        .map_err(|error| format!("Не удалось запустить игру: {error}"))?;
-    Ok(true)
+        .map_err(|error| format!("Не удалось запустить игру: {error}"))
 }
 
 fn launch_custom_jar(
@@ -417,7 +419,7 @@ fn launch_custom_jar(
     spec: &LaunchSpec,
     preferences: &Preferences,
     identity: &LaunchIdentity,
-) -> Result<bool, String> {
+) -> Result<Child, String> {
     let working_directory = if spec.working_directory.trim().is_empty() {
         store.game_dir()
     } else {
@@ -446,8 +448,7 @@ fn launch_custom_jar(
         .current_dir(&working_directory)
         .args(&args)
         .spawn()
-        .map_err(|error| format!("Не удалось запустить игру: {error}"))?;
-    Ok(true)
+        .map_err(|error| format!("Не удалось запустить игру: {error}"))
 }
 
 fn resolve_java(preferences: &Preferences) -> Result<PathBuf, String> {

@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   ArchitectureStatus,
   DistributionStatus,
+  LaunchStatus,
   PlayResult,
 } from "@/entities/launcher/model";
 
@@ -59,6 +60,10 @@ export function setOptionalMods(ids: string[]): Promise<void> {
 
 export function setMemoryGb(memoryGb: number): Promise<void> {
   return invoke("set_memory_gb", { memoryGb });
+}
+
+export function getLaunchStatus(): Promise<LaunchStatus> {
+  return invoke<LaunchStatus>("get_launch_status");
 }
 
 export function playGame(nickname: string): Promise<PlayResult> {
