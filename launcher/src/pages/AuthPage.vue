@@ -5,14 +5,20 @@ import {
   startMicrosoftAuth,
   type DeviceCodeChallenge,
 } from "@/shared/api/launcher";
+import {
+  fitWindowToMicrosoftAuth,
+  fitWindowToScreen,
+} from "@/shared/lib/window";
 
 const emit = defineEmits<{
   complete: [nickname: string, authorized: boolean];
 }>();
 const nickname = ref("");
 const microsoftLoading = ref(false);
+const microsoftStatusVisible = ref(false);
 const challenge = ref<DeviceCodeChallenge | null>(null);
 const oauthError = ref<string | null>(null);
+let microsoftAttempt = 0;
 
 const isValid = computed(() => /^[A-Za-z0-9_]{3,16}$/.test(nickname.value));
 
@@ -23,28 +29,40 @@ function continueWithNickname(): void {
 async function authorizeMicrosoft(): Promise<void> {
   if (microsoftLoading.value) return;
 
+  const attempt = ++microsoftAttempt;
   microsoftLoading.value = true;
+  microsoftStatusVisible.value = true;
   challenge.value = null;
   oauthError.value = null;
+  void fitWindowToMicrosoftAuth();
 
   try {
     const deviceChallenge = await startMicrosoftAuth();
+    if (attempt !== microsoftAttempt) return;
     challenge.value = deviceChallenge;
     const profile = await completeMicrosoftAuth(deviceChallenge);
+    if (attempt !== microsoftAttempt) return;
     emit("complete", profile.name, true);
   } catch (error) {
+    if (attempt !== microsoftAttempt) return;
     oauthError.value =
       typeof error === "string"
         ? error
         : "Не удалось выполнить авторизацию Microsoft";
   } finally {
-    microsoftLoading.value = false;
+    if (attempt === microsoftAttempt) {
+      microsoftLoading.value = false;
+    }
   }
 }
 
 function closeMicrosoftStatus(): void {
+  microsoftAttempt += 1;
+  microsoftStatusVisible.value = false;
+  microsoftLoading.value = false;
   challenge.value = null;
   oauthError.value = null;
+  void fitWindowToScreen("auth");
 }
 </script>
 
@@ -61,14 +79,14 @@ function closeMicrosoftStatus(): void {
         @click="authorizeMicrosoft"
       >
         <svg
-          class="microsoft-logo"
-          viewBox="0 0 21 21"
+          class="microsoft-icon"
+          viewBox="0 0 24 24"
           aria-hidden="true"
         >
-          <rect width="10" height="10" fill="#f25022" />
-          <rect x="11" width="10" height="10" fill="#7fba00" />
-          <rect y="11" width="10" height="10" fill="#00a4ef" />
-          <rect x="11" y="11" width="10" height="10" fill="#ffb900" />
+          <path fill="#F25022" d="M2 2h9.5v9.5H2z" />
+          <path fill="#7FBA00" d="M12.5 2H22v9.5h-9.5z" />
+          <path fill="#00A4EF" d="M2 12.5h9.5V22H2z" />
+          <path fill="#FFB900" d="M12.5 12.5H22V22h-9.5z" />
         </svg>
         <span>Авторизация Microsoft</span>
       </button>
@@ -99,7 +117,7 @@ function closeMicrosoftStatus(): void {
     </form>
 
     <div
-      v-if="microsoftLoading || oauthError"
+      v-if="microsoftStatusVisible"
       class="microsoft-status"
       role="dialog"
       aria-live="polite"
@@ -121,7 +139,6 @@ function closeMicrosoftStatus(): void {
       </p>
       <p v-if="oauthError" class="oauth-error">{{ oauthError }}</p>
       <button
-        v-if="oauthError"
         class="dismiss-button"
         type="button"
         @click="closeMicrosoftStatus"
@@ -156,19 +173,6 @@ function closeMicrosoftStatus(): void {
   font-weight: 600;
 }
 
-.oauth-actions .microsoft-auth-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 11px;
-}
-
-.microsoft-logo {
-  width: 21px;
-  height: 21px;
-  flex: 0 0 21px;
-}
-
 .oauth-actions button:not(:disabled):hover,
 .continue-button:not(:disabled):hover {
   background: var(--accent-hover);
@@ -177,6 +181,19 @@ function closeMicrosoftStatus(): void {
 .oauth-actions button:disabled {
   cursor: wait;
   opacity: 0.72;
+}
+
+.oauth-actions .microsoft-auth-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.microsoft-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
 }
 
 .oauth-actions .site-auth-button {
@@ -267,7 +284,7 @@ input:focus {
   inset: 32px 0 0;
   display: flex;
   align-items: center;
-  padding: 40px;
+  padding: 24px 40px 88px;
   background: #171717;
   text-align: center;
   flex-direction: column;
@@ -275,14 +292,14 @@ input:focus {
 }
 
 .microsoft-status h2 {
-  margin: 20px 0 0;
+  margin: 14px 0 0;
   color: #fff;
   font-size: 18px;
   font-weight: 700;
 }
 
 .microsoft-status code {
-  margin-top: 22px;
+  margin-top: 16px;
   padding: 12px 18px;
   color: #fff;
   border: 1px solid #404040;
@@ -295,7 +312,7 @@ input:focus {
 }
 
 .microsoft-status p {
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   color: #a3a3a3;
   font-size: 13px;
   line-height: 18px;
@@ -316,15 +333,21 @@ input:focus {
 }
 
 .dismiss-button {
-  width: 200px;
+  position: absolute;
+  right: 40px;
+  bottom: 24px;
+  left: 40px;
   height: 48px;
-  margin-top: 24px;
   color: #fff;
   border: 0;
   border-radius: 8px;
   background: var(--accent);
   font-size: 15px;
   font-weight: 700;
+}
+
+.dismiss-button:hover {
+  background: var(--accent-hover);
 }
 
 @keyframes oauth-spin {
