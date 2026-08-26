@@ -87,7 +87,7 @@ impl AuthState {
             .map(|session| session.profile.clone()))
     }
 
-    pub fn launch_identity(&self, _nickname: &str) -> Result<LaunchIdentity, String> {
+    pub fn launch_identity(&self, nickname: &str) -> Result<LaunchIdentity, String> {
         let session = self
             .session
             .lock()
@@ -101,10 +101,16 @@ impl AuthState {
             });
         }
 
-        Err(
-            "Для запуска SpringRP требуется авторизация Microsoft. Вернитесь на экран входа и войдите в аккаунт с приобретённой Minecraft: Java Edition."
-                .into(),
-        )
+        let name = nickname.trim();
+        if name.is_empty() {
+            return Err("Сначала введите ник или авторизуйтесь".into());
+        }
+
+        Ok(LaunchIdentity {
+            name: name.to_string(),
+            uuid: "00000000-0000-0000-0000-000000000000".into(),
+            access_token: "0".into(),
+        })
     }
 }
 
@@ -422,10 +428,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn launch_without_microsoft_session_is_rejected() {
+    fn launch_without_microsoft_session_uses_offline_identity() {
         let state = AuthState::default();
-        let error = state.launch_identity("OfflineName").unwrap_err();
-        assert!(error.contains("авторизация Microsoft"));
+        let identity = state.launch_identity("OfflineName").unwrap();
+        assert_eq!(identity.name, "OfflineName");
+        assert_eq!(identity.uuid, "00000000-0000-0000-0000-000000000000");
+        assert_eq!(identity.access_token, "0");
     }
 
     #[test]

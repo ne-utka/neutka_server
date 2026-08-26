@@ -41,9 +41,9 @@ the resulting authorization through Xbox Live, XSTS and Minecraft Services. The
 final profile request returns only the Minecraft player ID and name used by the
 UI.
 
-Game startup requires this authenticated profile. The launcher never fabricates
-an offline UUID or access token because the SpringRP server uses authenticated
-online-mode sessions.
+When Microsoft authentication is not used, manual nickname mode deliberately
+launches with the legacy offline identity (`UUID=0`, `accessToken=0`). This mode
+does not satisfy an online-mode server's authentication check.
 
 Tokens never cross the Tauri IPC boundary. `AuthState` retains the Minecraft
 access token, optional Microsoft refresh token and authenticated profile only

@@ -46,6 +46,8 @@ See the [Privacy Policy](PRIVACY.md) for the complete data-handling statement.
 - validation that the account has a Minecraft: Java Edition profile;
 - display of the Minecraft player name and an avatar fetched from
   `mc-heads.net`;
+- manual nickname mode that does not contact Microsoft and launches with an
+  offline identity;
 - local sign-out that clears the active authentication session;
 - launcher home and settings interface;
 - installation and updating of the SpringRP modpack;
