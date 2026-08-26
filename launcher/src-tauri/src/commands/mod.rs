@@ -119,7 +119,31 @@ pub async fn play_game(
         .load_preferences()
         .map_err(|error| error.to_string())?;
     let (result, child) =
-        distribution::play(&app, identity, &mut preferences).await?;
+        distribution::play(&app, identity, &mut preferences, false).await?;
+    let _ = store.save_preferences(&preferences);
+    permit.track_game(child);
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn reinstall_game(
+    app: AppHandle,
+    nickname: String,
+    auth_state: State<'_, AuthState>,
+    launch_state: State<'_, LaunchState>,
+) -> Result<PlayResult, String> {
+    if launch_state.status().game_running {
+        return Err("Закройте игру, чтобы переустановить клиент".into());
+    }
+
+    let permit = launch_state.try_acquire(app.clone())?;
+    let identity = auth_state.launch_identity(&nickname)?;
+    let store = distribution::store(&app)?;
+    let mut preferences = store
+        .load_preferences()
+        .map_err(|error| error.to_string())?;
+    let (result, child) =
+        distribution::play(&app, identity, &mut preferences, true).await?;
     let _ = store.save_preferences(&preferences);
     permit.track_game(child);
     Ok(result)

@@ -70,6 +70,10 @@ export function playGame(nickname: string): Promise<PlayResult> {
   return invoke<PlayResult>("play_game", { nickname });
 }
 
+export function reinstallGame(nickname: string): Promise<PlayResult> {
+  return invoke<PlayResult>("reinstall_game", { nickname });
+}
+
 export function openGameFolder(): Promise<void> {
   return invoke("open_game_folder");
 }

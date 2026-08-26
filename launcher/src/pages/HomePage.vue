@@ -111,7 +111,7 @@ async function openFolder(): Promise<void> {
 .home-page {
   width: 376px;
   margin: 0 auto;
-  padding-top: 64px;
+  padding-top: 40px;
 }
 
 .profile {
@@ -166,14 +166,14 @@ async function openFolder(): Promise<void> {
 .play-button {
   width: 376px;
   height: 64px;
-  margin-top: 24px;
+  margin-top: 18px;
   padding: 0;
   color: #fff;
   border: 0;
   border-radius: 9px;
   background: var(--accent);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .play-button:hover:not(:disabled) {
@@ -214,7 +214,7 @@ async function openFolder(): Promise<void> {
 
 .quick-actions {
   display: grid;
-  margin-top: 12px;
+  margin-top: 10px;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }

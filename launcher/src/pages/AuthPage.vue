@@ -18,7 +18,9 @@ const microsoftLoading = ref(false);
 const microsoftStatusVisible = ref(false);
 const challenge = ref<DeviceCodeChallenge | null>(null);
 const oauthError = ref<string | null>(null);
+const codeCopied = ref(false);
 let microsoftAttempt = 0;
+let copiedReset: ReturnType<typeof setTimeout> | null = null;
 
 const isValid = computed(() => /^[A-Za-z0-9_]{3,16}$/.test(nickname.value));
 
@@ -34,6 +36,7 @@ async function authorizeMicrosoft(): Promise<void> {
   microsoftStatusVisible.value = true;
   challenge.value = null;
   oauthError.value = null;
+  codeCopied.value = false;
   void fitWindowToMicrosoftAuth();
 
   try {
@@ -62,7 +65,38 @@ function closeMicrosoftStatus(): void {
   microsoftLoading.value = false;
   challenge.value = null;
   oauthError.value = null;
+  codeCopied.value = false;
+  if (copiedReset) {
+    clearTimeout(copiedReset);
+    copiedReset = null;
+  }
   void fitWindowToScreen("auth");
+}
+
+async function copyMicrosoftCode(): Promise<void> {
+  const userCode = challenge.value?.userCode;
+  if (!userCode) return;
+
+  try {
+    await navigator.clipboard.writeText(userCode);
+  } catch {
+    const field = document.createElement("textarea");
+    field.value = userCode;
+    field.setAttribute("readonly", "");
+    field.style.position = "fixed";
+    field.style.left = "-9999px";
+    document.body.append(field);
+    field.select();
+    document.execCommand("copy");
+    field.remove();
+  }
+
+  codeCopied.value = true;
+  if (copiedReset) clearTimeout(copiedReset);
+  copiedReset = setTimeout(() => {
+    codeCopied.value = false;
+    copiedReset = null;
+  }, 2000);
 }
 </script>
 
@@ -133,9 +167,17 @@ function closeMicrosoftStatus(): void {
               : "Подготовка входа…"
         }}
       </h2>
-      <code v-if="challenge && !oauthError">{{ challenge.userCode }}</code>
+      <button
+        v-if="challenge && !oauthError"
+        class="microsoft-code"
+        type="button"
+        aria-label="Скопировать код Microsoft"
+        @click="copyMicrosoftCode"
+      >
+        {{ challenge.userCode }}
+      </button>
       <p v-if="challenge && !oauthError">
-        Введите этот код на странице Microsoft
+        {{ codeCopied ? "(скопировано)" : "Введите этот код на странице Microsoft" }}
       </p>
       <p v-if="oauthError" class="oauth-error">{{ oauthError }}</p>
       <button
@@ -153,12 +195,12 @@ function closeMicrosoftStatus(): void {
 .auth-page {
   width: 376px;
   margin: 0 auto;
-  padding-top: 66px;
+  padding: 26px 0;
 }
 
 .oauth-actions {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .oauth-actions button {
@@ -169,7 +211,7 @@ function closeMicrosoftStatus(): void {
   border: 0;
   border-radius: 9px;
   background: var(--accent);
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
 }
 
@@ -206,13 +248,13 @@ function closeMicrosoftStatus(): void {
 .divider {
   display: grid;
   align-items: center;
-  margin: 32px 0 24px;
+  margin: 20px 0 16px;
   grid-template-columns: 1fr auto 1fr;
   gap: 16px;
 }
 
 .divider span {
-  height: 1px;
+  height: 2px;
   background: #404040;
 }
 
@@ -220,7 +262,7 @@ function closeMicrosoftStatus(): void {
   margin: 0;
   color: #565656;
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 700;
   line-height: 18px;
 }
 
@@ -252,23 +294,23 @@ input:focus {
 }
 
 .hint {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: #565656;
   font-size: 12px;
-  font-weight: 400;
+  font-weight: 700;
   line-height: 15px;
 }
 
 .continue-button {
   width: 376px;
   height: 64px;
-  margin-top: 20px;
+  margin-top: 16px;
   padding: 0;
   color: #fff;
   border: 0;
   border-radius: 8px;
   background: var(--accent);
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
 }
 
@@ -298,7 +340,7 @@ input:focus {
   font-weight: 700;
 }
 
-.microsoft-status code {
+.microsoft-status .microsoft-code {
   margin-top: 16px;
   padding: 12px 18px;
   color: #fff;
@@ -309,6 +351,11 @@ input:focus {
   font-size: 24px;
   font-weight: 700;
   letter-spacing: 0.14em;
+}
+
+.microsoft-status .microsoft-code:hover {
+  border-color: #525252;
+  background: #2a2a2a;
 }
 
 .microsoft-status p {
@@ -342,7 +389,7 @@ input:focus {
   border: 0;
   border-radius: 8px;
   background: var(--accent);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
 }
 

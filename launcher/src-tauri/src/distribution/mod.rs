@@ -206,14 +206,44 @@ pub async fn status(app: &AppHandle) -> DistributionStatus {
     status
 }
 
+pub fn clear_client_install(store: &TomlConfigStore) -> Result<(), String> {
+    let game_dir = store.game_dir();
+    if game_dir.exists() {
+        fs::remove_dir_all(&game_dir).map_err(io_error)?;
+    }
+    let install = store.app_data_dir().join("install.toml");
+    if install.exists() {
+        fs::remove_file(&install).map_err(io_error)?;
+    }
+    let archive = store.cache_dir().join("game.zip");
+    if archive.exists() {
+        fs::remove_file(&archive).map_err(io_error)?;
+    }
+    Ok(())
+}
+
 pub async fn play(
     app: &AppHandle,
     identity: LaunchIdentity,
     preferences: &mut Preferences,
+    force_reinstall: bool,
 ) -> Result<(PlayResult, Child), String> {
     let store = store(app)?;
     fs::create_dir_all(store.game_dir()).map_err(io_error)?;
     fs::create_dir_all(store.cache_dir()).map_err(io_error)?;
+
+    if force_reinstall {
+        emit(
+            app,
+            "extract",
+            "Удаление текущей сборки…",
+            0,
+            0,
+        );
+        clear_client_install(&store)?;
+        fs::create_dir_all(store.game_dir()).map_err(io_error)?;
+        fs::create_dir_all(store.cache_dir()).map_err(io_error)?;
+    }
 
     emit(
         app,

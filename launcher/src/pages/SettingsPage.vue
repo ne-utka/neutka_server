@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import type { OptionalMod } from "@/entities/launcher/model";
 import {
   getDistributionStatus,
@@ -8,6 +8,12 @@ import {
 } from "@/shared/api/launcher";
 import AppIcon from "@/shared/ui/AppIcon.vue";
 
+const props = defineProps<{
+  busy: boolean;
+  gameRunning: boolean;
+}>();
+defineEmits<{ reinstall: [] }>();
+
 const memory = ref("4");
 const memoryOptions = ref<number[]>([2, 4, 6, 8]);
 const totalMemory = ref(0);
@@ -15,6 +21,19 @@ const recommendedMemory = ref(0);
 const mods = ref<OptionalMod[]>([]);
 const enabled = ref<string[]>([]);
 const remoteError = ref<string | null>(null);
+
+const reinstallDisabled = computed(
+  () => props.busy || props.gameRunning,
+);
+const reinstallHint = computed(() => {
+  if (props.gameRunning) {
+    return "Закройте игру, чтобы переустановить клиент.";
+  }
+  if (props.busy) {
+    return "Дождитесь окончания загрузки или запуска.";
+  }
+  return "Удалит локальную сборку и скачает её заново.";
+});
 
 onMounted(() => {
   void load();
@@ -108,6 +127,18 @@ async function toggleMod(id: string): Promise<void> {
         </button>
       </li>
     </ul>
+
+    <h2>Клиент</h2>
+    <div class="section-divider" />
+    <button
+      class="reinstall-button"
+      type="button"
+      :disabled="reinstallDisabled"
+      @click="$emit('reinstall')"
+    >
+      Переустановить клиент
+    </button>
+    <p class="hint">{{ reinstallHint }}</p>
   </section>
 </template>
 
@@ -206,5 +237,28 @@ h2 {
 
 .mod-list button.active .mod-state {
   color: var(--accent);
+}
+
+.reinstall-button {
+  width: 100%;
+  height: 56px;
+  margin-top: 16px;
+  padding: 0;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.reinstall-button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.reinstall-button:disabled {
+  color: #505050;
+  background: #2b2b2b;
+  cursor: default;
 }
 </style>

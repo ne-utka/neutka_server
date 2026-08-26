@@ -13,6 +13,7 @@ import {
   getAuthenticatedProfile,
   getLaunchStatus,
   playGame,
+  reinstallGame,
   signOutMicrosoft,
 } from "@/shared/api/launcher";
 import {
@@ -108,21 +109,25 @@ async function refreshDistributionStatus(): Promise<void> {
   }
 }
 
-async function startGame(): Promise<void> {
+async function startGame(options: { reinstall?: boolean } = {}): Promise<void> {
   if (launchBusy.value) return;
 
   launchBusy.value = true;
   launchError.value = null;
   launchNotice.value = null;
   launchProgress.value = {
-    phase: "manifest",
-    label: "Подключение к серверу…",
+    phase: options.reinstall ? "extract" : "manifest",
+    label: options.reinstall
+      ? "Удаление текущей сборки…"
+      : "Подключение к серверу…",
     received: 0,
     total: 0,
   };
 
   try {
-    const result = await playGame(nickname.value);
+    const result = options.reinstall
+      ? await reinstallGame(nickname.value)
+      : await playGame(nickname.value);
     needsDownload.value = false;
     remoteVersion.value = result.installedVersion;
   } catch (caught) {
@@ -171,6 +176,12 @@ async function logout(): Promise<void> {
   authorized.value = false;
   screen.value = "auth";
 }
+
+function reinstallClient(): void {
+  if (launchBusy.value) return;
+  screen.value = "home";
+  void startGame({ reinstall: true });
+}
 </script>
 
 <template>
@@ -188,7 +199,7 @@ async function logout(): Promise<void> {
         :progress="launchProgress"
         :error="launchError"
         :notice="launchNotice"
-        @play="startGame"
+        @play="startGame()"
         @logout="logout"
         @settings="screen = 'settings'"
       />
@@ -196,7 +207,12 @@ async function logout(): Promise<void> {
         v-else-if="screen === 'auth'"
         @complete="completeAuthorization"
       />
-      <SettingsPage v-else />
+      <SettingsPage
+        v-else
+        :busy="launchBusy"
+        :game-running="gameRunning"
+        @reinstall="reinstallClient"
+      />
     </main>
   </div>
 </template>

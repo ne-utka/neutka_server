@@ -37,6 +37,7 @@ pub fn run() {
             commands::set_memory_gb,
             commands::get_launch_status,
             commands::play_game,
+            commands::reinstall_game,
             commands::open_game_folder
         ])
         .run(tauri::generate_context!())
