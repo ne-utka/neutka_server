@@ -1,0 +1,8 @@
+# Local secrets and the live auth queue. Never commit.
+.env
+pending.json
+bound.json
+codes.json
+bot.log
+offset.json
+poll.lock

@@ -5,7 +5,7 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::{
     application::ArchitectureService,
-    auth::{self, AuthState, AuthenticatedProfile, DeviceCodeChallenge},
+    auth::{self, AuthState, AuthenticatedProfile, DeviceCodeChallenge, NicknameChallenge},
     distribution::{self, DistributionStatus, PlayResult},
     domain::ArchitectureStatus,
     launch_state::{LaunchState, LaunchStatus},
@@ -47,6 +47,23 @@ pub async fn complete_microsoft_auth(
         result.microsoft_refresh_token,
     )?;
     Ok(result.profile)
+}
+
+#[tauri::command]
+pub async fn start_nickname_auth(nick: String) -> Result<NicknameChallenge, String> {
+    auth::start_nickname_auth(&nick).await
+}
+
+#[tauri::command]
+pub async fn complete_nickname_auth(
+    code: String,
+    expires_in: u64,
+) -> Result<AuthenticatedProfile, String> {
+    let nick = auth::complete_nickname_auth(&code, expires_in).await?;
+    Ok(AuthenticatedProfile {
+        id: "0".into(),
+        name: nick,
+    })
 }
 
 #[tauri::command]

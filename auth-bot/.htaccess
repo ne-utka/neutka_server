@@ -1,0 +1,9 @@
+Options -Indexes
+
+<FilesMatch "^(\.env|pending\.json|bound\.json|codes\.json|bot\.log|offset\.json|poll\.lock)$">
+    Require all denied
+</FilesMatch>
+<FilesMatch "^(\.env|pending\.json|bound\.json|codes\.json|bot\.log|offset\.json|poll\.lock)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>

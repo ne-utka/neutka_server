@@ -5,11 +5,11 @@ export type AppScreen = "home" | "auth" | "settings";
 
 const SCREEN_SIZES: Record<AppScreen, readonly [number, number]> = {
   home: [456, 350],
-  auth: [456, 435],
+  auth: [456, 359],
   settings: [528, 679],
 };
 
-const MICROSOFT_AUTH_SIZE = [456, 400] as const;
+const MICROSOFT_AUTH_SIZE = [456, 359] as const;
 
 function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;

@@ -13,6 +13,7 @@ const DEVICE_CODE_URL: &str =
     "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
 const TOKEN_URL: &str =
     "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
+const NICKNAME_AUTH_URL: &str = "https://springrp.ru/auth-bot/launcher.php";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,6 +24,15 @@ pub struct DeviceCodeChallenge {
     pub expires_in: u64,
     pub interval: u64,
     pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NicknameChallenge {
+    pub code: String,
+    pub user_code: String,
+    pub nick: String,
+    pub expires_in: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -419,6 +429,123 @@ async fn load_minecraft_profile(
         .map_err(|_| "Minecraft вернул некорректный профиль".to_string())
 }
 
+pub async fn start_nickname_auth(nick: &str) -> Result<NicknameChallenge, String> {
+    let nick = nick.trim();
+    if !is_minecraft_nick(nick) {
+        return Err("Ник должен быть 3–16 символов: латиница, цифры и _".into());
+    }
+
+    let response = Client::new()
+        .post(NICKNAME_AUTH_URL)
+        .json(&json!({ "nick": nick }))
+        .send()
+        .await
+        .map_err(|_| "Нет соединения с сервером авторизации".to_string())?;
+
+    let payload: Value = response
+        .json()
+        .await
+        .map_err(|_| "Сервер авторизации вернул некорректный ответ".to_string())?;
+
+    if payload.get("ok").and_then(Value::as_bool) != Some(true) {
+        return Err(match payload.get("error").and_then(Value::as_str) {
+            Some("not_bound") => "not_bound".into(),
+            Some("bad_nick") => {
+                "Ник должен быть 3–16 символов: латиница, цифры и _".into()
+            }
+            _ => "Не удалось начать вход по нику".into(),
+        });
+    }
+
+    let code = payload
+        .get("code")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "Сервер авторизации не вернул код".to_string())?;
+    let user_code = payload
+        .get("user_code")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .unwrap_or_else(|| format_login_code(code));
+    let bound_nick = payload
+        .get("nick")
+        .and_then(Value::as_str)
+        .unwrap_or(nick)
+        .to_string();
+    let expires_in = payload
+        .get("expires_in")
+        .and_then(Value::as_u64)
+        .unwrap_or(300);
+
+    Ok(NicknameChallenge {
+        code: code.to_string(),
+        user_code,
+        nick: bound_nick,
+        expires_in,
+    })
+}
+
+pub async fn complete_nickname_auth(
+    code: &str,
+    expires_in: u64,
+) -> Result<String, String> {
+    let client = Client::new();
+    let deadline = Instant::now() + Duration::from_secs(expires_in.clamp(30, 600));
+
+    loop {
+        let response = client
+            .get(format!("{NICKNAME_AUTH_URL}?code={code}"))
+            .send()
+            .await
+            .map_err(|_| "Нет соединения с сервером авторизации".to_string())?;
+        let payload: Value = response
+            .json()
+            .await
+            .map_err(|_| "Сервер авторизации вернул некорректный ответ".to_string())?;
+
+        match payload.get("status").and_then(Value::as_str) {
+            Some("verified") => {
+                let nick = payload
+                    .get("nick")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .trim();
+                if is_minecraft_nick(nick) {
+                    return Ok(nick.to_string());
+                }
+                return Err("Сервер авторизации вернул некорректный ник".into());
+            }
+            Some("pending") => {}
+            Some("expired") => {
+                return Err("Код истёк. Нажмите «Продолжить» ещё раз".into());
+            }
+            Some("missing") => {
+                return Err("Код больше не действует. Нажмите «Продолжить» ещё раз".into());
+            }
+            _ => {
+                return Err("Сервер авторизации вернул некорректный ответ".into());
+            }
+        }
+
+        if Instant::now() >= deadline {
+            return Err("Время ожидания кода истекло. Нажмите «Продолжить» ещё раз".into());
+        }
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+}
+
+fn is_minecraft_nick(value: &str) -> bool {
+    let len = value.len();
+    (3..=16).contains(&len) && value.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+}
+
+fn format_login_code(code: &str) -> String {
+    if code.len() == 6 {
+        format!("{} {}", &code[..3], &code[3..])
+    } else {
+        code.to_string()
+    }
+}
+
 fn network_error(_: reqwest::Error) -> String {
     "Нет соединения с сервисами Microsoft".into()
 }
@@ -454,6 +581,19 @@ mod tests {
         assert_eq!(identity.name, "SpringPlayer");
         assert_eq!(identity.uuid, "12345678-1234-1234-1234-1234567890ab");
         assert_eq!(identity.access_token, "minecraft-token");
+    }
+
+    #[test]
+    fn login_code_is_shown_in_two_groups() {
+        assert_eq!(format_login_code("482193"), "482 193");
+    }
+
+    #[test]
+    fn minecraft_nicks_match_offline_rules() {
+        assert!(is_minecraft_nick("Steve"));
+        assert!(is_minecraft_nick("A_1"));
+        assert!(!is_minecraft_nick("аб"));
+        assert!(!is_minecraft_nick("ab"));
     }
 }
 

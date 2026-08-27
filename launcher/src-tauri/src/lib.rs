@@ -30,6 +30,8 @@ pub fn run() {
             commands::get_architecture_status,
             commands::start_microsoft_auth,
             commands::complete_microsoft_auth,
+            commands::start_nickname_auth,
+            commands::complete_nickname_auth,
             commands::get_authenticated_profile,
             commands::sign_out_microsoft,
             commands::get_distribution_status,

@@ -2,8 +2,11 @@
 import { computed, ref } from "vue";
 import {
   completeMicrosoftAuth,
+  completeNicknameAuth,
   startMicrosoftAuth,
+  startNicknameAuth,
   type DeviceCodeChallenge,
+  type NicknameChallenge,
 } from "@/shared/api/launcher";
 import {
   fitWindowToMicrosoftAuth,
@@ -18,18 +21,67 @@ const microsoftLoading = ref(false);
 const microsoftStatusVisible = ref(false);
 const challenge = ref<DeviceCodeChallenge | null>(null);
 const oauthError = ref<string | null>(null);
+const nickStatusVisible = ref(false);
+const nickLoading = ref(false);
+const nickChallenge = ref<NicknameChallenge | null>(null);
+const nickError = ref<string | null>(null);
+const nickUnbound = ref(false);
 const codeCopied = ref(false);
 let microsoftAttempt = 0;
+let nickAttempt = 0;
 let copiedReset: ReturnType<typeof setTimeout> | null = null;
 
 const isValid = computed(() => /^[A-Za-z0-9_]{3,16}$/.test(nickname.value));
+const nickWaiting = computed(
+  () => nickStatusVisible.value && !nickUnbound.value && !nickError.value,
+);
 
-function continueWithNickname(): void {
-  if (isValid.value) emit("complete", nickname.value, false);
+function errorText(error: unknown, fallback: string): string {
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return fallback;
+}
+
+async function continueWithNickname(): Promise<void> {
+  if (!isValid.value || nickLoading.value || microsoftLoading.value) return;
+
+  const attempt = ++nickAttempt;
+  nickLoading.value = true;
+  nickStatusVisible.value = true;
+  nickChallenge.value = null;
+  nickError.value = null;
+  nickUnbound.value = false;
+  codeCopied.value = false;
+  void fitWindowToMicrosoftAuth();
+
+  try {
+    const nextChallenge = await startNicknameAuth(nickname.value);
+    if (attempt !== nickAttempt) return;
+    nickChallenge.value = nextChallenge;
+    const profile = await completeNicknameAuth(nextChallenge);
+    if (attempt !== nickAttempt) return;
+    emit("complete", profile.name, true);
+  } catch (error) {
+    if (attempt !== nickAttempt) return;
+    const message = errorText(error, "Не удалось войти по нику");
+    if (message === "not_bound") {
+      nickUnbound.value = true;
+      nickError.value = null;
+      return;
+    }
+    nickError.value = message;
+  } finally {
+    if (attempt === nickAttempt) {
+      nickLoading.value = false;
+    }
+  }
 }
 
 async function authorizeMicrosoft(): Promise<void> {
-  if (microsoftLoading.value) return;
+  if (microsoftLoading.value || nickLoading.value) return;
 
   const attempt = ++microsoftAttempt;
   microsoftLoading.value = true;
@@ -48,10 +100,10 @@ async function authorizeMicrosoft(): Promise<void> {
     emit("complete", profile.name, true);
   } catch (error) {
     if (attempt !== microsoftAttempt) return;
-    oauthError.value =
-      typeof error === "string"
-        ? error
-        : "Не удалось выполнить авторизацию Microsoft";
+    oauthError.value = errorText(
+      error,
+      "Не удалось выполнить авторизацию Microsoft",
+    );
   } finally {
     if (attempt === microsoftAttempt) {
       microsoftLoading.value = false;
@@ -73,15 +125,30 @@ function closeMicrosoftStatus(): void {
   void fitWindowToScreen("auth");
 }
 
-async function copyMicrosoftCode(): Promise<void> {
-  const userCode = challenge.value?.userCode;
-  if (!userCode) return;
+function closeNickStatus(): void {
+  nickAttempt += 1;
+  nickStatusVisible.value = false;
+  nickLoading.value = false;
+  nickChallenge.value = null;
+  nickError.value = null;
+  nickUnbound.value = false;
+  codeCopied.value = false;
+  if (copiedReset) {
+    clearTimeout(copiedReset);
+    copiedReset = null;
+  }
+  void fitWindowToScreen("auth");
+}
+
+async function copyDisplayedCode(value: string | undefined): Promise<void> {
+  if (!value) return;
+  const plain = value.replace(/\s+/g, "");
 
   try {
-    await navigator.clipboard.writeText(userCode);
+    await navigator.clipboard.writeText(plain);
   } catch {
     const field = document.createElement("textarea");
-    field.value = userCode;
+    field.value = plain;
     field.setAttribute("readonly", "");
     field.style.position = "fixed";
     field.style.left = "-9999px";
@@ -103,13 +170,10 @@ async function copyMicrosoftCode(): Promise<void> {
 <template>
   <section class="auth-page">
     <div class="oauth-actions">
-      <button class="site-auth-button" type="button" disabled>
-        Авторизация на сайте
-      </button>
       <button
         class="microsoft-auth-button"
         type="button"
-        :disabled="microsoftLoading"
+        :disabled="microsoftLoading || nickLoading"
         @click="authorizeMicrosoft"
       >
         <svg
@@ -145,7 +209,11 @@ async function copyMicrosoftCode(): Promise<void> {
       <p id="nickname-hint" class="hint">
         Латиница, от 3 до 16 символов
       </p>
-      <button class="continue-button" type="submit" :disabled="!isValid">
+      <button
+        class="continue-button"
+        type="submit"
+        :disabled="!isValid || nickLoading || microsoftLoading"
+      >
         Продолжить
       </button>
     </form>
@@ -172,7 +240,7 @@ async function copyMicrosoftCode(): Promise<void> {
         class="microsoft-code"
         type="button"
         aria-label="Скопировать код Microsoft"
-        @click="copyMicrosoftCode"
+        @click="copyDisplayedCode(challenge.userCode)"
       >
         {{ challenge.userCode }}
       </button>
@@ -184,6 +252,58 @@ async function copyMicrosoftCode(): Promise<void> {
         class="dismiss-button"
         type="button"
         @click="closeMicrosoftStatus"
+      >
+        Вернуться
+      </button>
+    </div>
+
+    <div
+      v-if="nickStatusVisible"
+      class="microsoft-status"
+      role="dialog"
+      aria-live="polite"
+      aria-label="Вход по нику"
+    >
+      <span v-if="nickWaiting" class="oauth-spinner" />
+      <h2>
+        {{
+          nickUnbound
+            ? "Ник не привязан"
+            : nickError
+              ? "Ошибка входа"
+              : nickChallenge
+                ? "Подтвердите вход в Telegram"
+                : "Проверяем ник…"
+        }}
+      </h2>
+      <button
+        v-if="nickChallenge && nickWaiting"
+        class="microsoft-code"
+        type="button"
+        aria-label="Скопировать код"
+        @click="copyDisplayedCode(nickChallenge.userCode)"
+      >
+        {{ nickChallenge.userCode }}
+      </button>
+      <p v-if="nickChallenge && nickWaiting">
+        {{
+          codeCopied
+            ? "(скопировано)"
+            : "Отправьте этот код боту @springauthbot"
+        }}
+      </p>
+      <p v-if="nickUnbound" class="oauth-error">
+        Вы не привязали никнейм в
+        <a href="https://t.me/springauthbot" target="_blank" rel="noreferrer">
+          @springauthbot
+        </a>.
+        Напишите боту /auth и этот ник, затем нажмите «Продолжить» снова.
+      </p>
+      <p v-if="nickError" class="oauth-error">{{ nickError }}</p>
+      <button
+        class="dismiss-button"
+        type="button"
+        @click="closeNickStatus"
       >
         Вернуться
       </button>
@@ -200,7 +320,6 @@ async function copyMicrosoftCode(): Promise<void> {
 
 .oauth-actions {
   display: grid;
-  gap: 12px;
 }
 
 .oauth-actions button {
@@ -236,13 +355,6 @@ async function copyMicrosoftCode(): Promise<void> {
   width: 20px;
   height: 20px;
   flex: 0 0 auto;
-}
-
-.oauth-actions .site-auth-button {
-  color: #505050;
-  background: #2b2b2b;
-  cursor: default;
-  opacity: 1;
 }
 
 .divider {
@@ -363,6 +475,11 @@ input:focus {
   color: #a3a3a3;
   font-size: 13px;
   line-height: 18px;
+}
+
+.microsoft-status a {
+  color: #fff;
+  text-decoration: underline;
 }
 
 .oauth-spinner {

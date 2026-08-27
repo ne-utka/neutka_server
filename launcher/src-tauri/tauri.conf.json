@@ -15,7 +15,7 @@
         "label": "main",
         "title": "SpringRP",
         "width": 456,
-        "height": 430,
+        "height": 359,
         "center": true,
         "decorations": false,
         "resizable": false,
@@ -25,7 +25,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: asset: http://asset.localhost; connect-src ipc: http://ipc.localhost https://mc-heads.net https://www.mc-heads.net"
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: asset: http://asset.localhost; connect-src ipc: http://ipc.localhost https://mc-heads.net https://www.mc-heads.net https://springrp.ru"
     }
   },
   "bundle": {
