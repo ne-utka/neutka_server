@@ -37,10 +37,18 @@ pub struct NicknameChallenge {
     pub expires_in: u64,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ProfileKind {
+    Microsoft,
+    Telegram,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthenticatedProfile {
     pub id: String,
     pub name: String,
+    pub kind: ProfileKind,
 }
 
 #[derive(Default)]
@@ -89,6 +97,7 @@ impl AuthState {
         let profile = AuthenticatedProfile {
             id: OFFLINE_PROFILE_ID.into(),
             name: name.to_string(),
+            kind: ProfileKind::Telegram,
         };
         self.replace_session(
             AuthKind::Telegram,
@@ -106,6 +115,11 @@ impl AuthState {
         minecraft_access_token: String,
         microsoft_refresh_token: Option<String>,
     ) -> Result<(), String> {
+        let mut profile = profile;
+        profile.kind = match kind {
+            AuthKind::Microsoft => ProfileKind::Microsoft,
+            AuthKind::Telegram => ProfileKind::Telegram,
+        };
         let session = AuthSession {
             kind,
             profile,
@@ -518,6 +532,12 @@ async fn authenticate_minecraft(
         .map_err(|_| "Minecraft не вернул access token".to_string())
 }
 
+#[derive(Deserialize)]
+struct MinecraftProfileResponse {
+    id: String,
+    name: String,
+}
+
 async fn load_minecraft_profile(
     client: &Client,
     access_token: &str,
@@ -539,10 +559,15 @@ async fn load_minecraft_profile(
         return Err(api_error("Minecraft Profile", response).await);
     }
 
-    response
+    let profile: MinecraftProfileResponse = response
         .json()
         .await
-        .map_err(|_| "Minecraft вернул некорректный профиль".to_string())
+        .map_err(|_| "Minecraft вернул некорректный профиль".to_string())?;
+    Ok(AuthenticatedProfile {
+        id: profile.id,
+        name: profile.name,
+        kind: ProfileKind::Microsoft,
+    })
 }
 
 pub async fn start_nickname_auth(nick: &str) -> Result<NicknameChallenge, String> {
@@ -649,6 +674,31 @@ pub async fn complete_nickname_auth(
     }
 }
 
+pub async fn nickname_still_bound(nick: &str) -> Result<bool, String> {
+    let nick = nick.trim();
+    if !is_minecraft_nick(nick) {
+        return Ok(false);
+    }
+
+    let response = Client::new()
+        .get(format!("{NICKNAME_AUTH_URL}?nick={nick}"))
+        .send()
+        .await
+        .map_err(|_| "unavailable".to_string())?;
+    let payload: Value = response
+        .json()
+        .await
+        .map_err(|_| "unavailable".to_string())?;
+
+    if payload.get("ok").and_then(Value::as_bool) == Some(true) {
+        return Ok(true);
+    }
+    if payload.get("error").and_then(Value::as_str) == Some("not_bound") {
+        return Ok(false);
+    }
+    Err("unavailable".into())
+}
+
 pub(crate) fn is_minecraft_nick(value: &str) -> bool {
     let len = value.len();
     (3..=16).contains(&len) && value.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
@@ -687,6 +737,7 @@ mod tests {
         assert_eq!(identity.name, "OfflineName");
         assert_eq!(identity.uuid, "00000000-0000-0000-0000-000000000000");
         assert_eq!(identity.access_token, "0");
+        assert_eq!(profile.kind, ProfileKind::Telegram);
     }
 
     #[test]
@@ -697,6 +748,7 @@ mod tests {
                 AuthenticatedProfile {
                     id: "123456781234123412341234567890ab".into(),
                     name: "SpringPlayer".into(),
+                    kind: ProfileKind::Microsoft,
                 },
                 "minecraft-token".into(),
                 None,
@@ -707,6 +759,10 @@ mod tests {
         assert_eq!(identity.name, "SpringPlayer");
         assert_eq!(identity.uuid, "12345678-1234-1234-1234-1234567890ab");
         assert_eq!(identity.access_token, "minecraft-token");
+        assert_eq!(
+            state.profile().unwrap().unwrap().kind,
+            ProfileKind::Microsoft
+        );
     }
 
     #[test]

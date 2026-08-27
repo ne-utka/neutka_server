@@ -8,6 +8,7 @@ import PlayerAvatar from "@/shared/ui/PlayerAvatar.vue";
 const props = defineProps<{
   nickname: string;
   authorized: boolean;
+  authKind: "microsoft" | "telegram" | null;
   busy: boolean;
   gameRunning: boolean;
   needsDownload: boolean;
@@ -20,6 +21,12 @@ defineEmits<{ play: []; logout: []; settings: [] }>();
 
 const folderError = ref<string | null>(null);
 const displayError = computed(() => folderError.value ?? props.error);
+const accountLabel = computed(() => {
+  if (!props.authorized) return "Не авторизован";
+  return props.authKind === "microsoft"
+    ? "Аккаунт Microsoft"
+    : "Ник из Telegram";
+});
 
 const playLabel = computed(() => {
   if (props.gameRunning) return "Игра запущена";
@@ -67,7 +74,7 @@ async function openFolder(): Promise<void> {
       <PlayerAvatar :nickname="nickname" />
       <div class="profile-copy">
         <strong>{{ nickname }}</strong>
-        <span>{{ authorized ? "Авторизован" : "Не авторизован" }}</span>
+        <span>{{ accountLabel }}</span>
       </div>
       <button
         class="logout-button"

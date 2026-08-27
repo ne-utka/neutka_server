@@ -15,6 +15,9 @@ Launcher nickname login (`launcher.php`):
 1. Player binds a nick with `/auth` in [@springauthbot](https://t.me/springauthbot).
 2. Launcher asks `launcher.php` for a 6-digit code, or gets `not_bound`.
 3. Player sends that code to the bot; launcher polls until it is verified.
+4. Later restores call `GET launcher.php?nick=` to confirm the nick is still
+   bound. `not_bound` drops the local session. Older PHP that ignores `nick`
+   keeps returning code status, and the launcher treats that as unreachable.
 
 Upload to `www/springrp.ru/auth-bot/` on REG.RU:
 

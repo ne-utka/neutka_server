@@ -81,6 +81,10 @@ pub enum ConfigError {
     Serialize(#[source] toml::ser::Error),
     #[error("configuration is invalid: {0}")]
     Validation(String),
+    #[error("session could not be protected")]
+    Protect,
+    #[error("session could not be unlocked")]
+    Unprotect,
 }
 
 #[cfg(test)]

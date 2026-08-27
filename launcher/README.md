@@ -27,13 +27,13 @@ Microsoft, Xbox Live and Minecraft Services:
 4. `api.minecraftservices.com` authenticates Minecraft and returns the
    Minecraft Java profile.
 
-The launcher reads only the Minecraft profile ID and player name needed to
-show the signed-in account. To display the avatar, the frontend requests a
-rendered player head from `mc-heads.net` using that player name. Authentication
-tokens are held in process memory; the current implementation does not write
-them to disk, send them to the
-SpringRP server or expose them to the Vue frontend. Signing out clears the
-in-memory session, and closing the launcher discards it.
+The launcher reads only the Minecraft profile ID, player name and account
+kind needed to show the signed-in account. To display the avatar, the
+frontend requests a rendered player head from `mc-heads.net` using that
+player name. Authentication tokens stay in native process memory and on
+disk as a Windows DPAPI-protected blob in `session.toml`. They are not
+sent to the SpringRP game server or exposed to the Vue frontend. Signing
+out deletes the local session file.
 
 Microsoft application (client) ID:
 `d901c992-cb44-480a-b86d-d59b74083e04`.
@@ -43,23 +43,23 @@ See the [Privacy Policy](PRIVACY.md) for the complete data-handling statement.
 ## Current functionality
 
 - Microsoft/Xbox/Minecraft device-code authentication;
-- validation that the account has a Minecraft: Java Edition profile;
-- display of the Minecraft player name and an avatar fetched from
+- Telegram nickname login through `@springauthbot`;
+- validation that the Microsoft account has a Minecraft: Java Edition profile;
+- display of the player name, the account kind and an avatar from
   `mc-heads.net`;
-- manual nickname mode that does not contact Microsoft and launches with an
-  offline identity;
-- local sign-out that clears the active authentication session;
+- nickname mode that does not contact Microsoft and launches with an
+  offline identity after Telegram confirms the nick is still bound;
+- local sign-out that clears the in-memory session and deletes `session.toml`;
 - launcher home and settings interface;
 - installation and updating of the SpringRP modpack;
 - installation of the official Minecraft client, assets, libraries and Java
   runtime;
 - authenticated game startup using the Minecraft profile returned by
-  Microsoft Services.
+  Microsoft Services, or the Telegram-confirmed offline nick.
 
 Not implemented in the current build:
 
 - connecting the disabled website-authentication button;
-- persistent Microsoft sessions between launcher restarts;
 - analytics, advertising or telemetry.
 
 ## Development

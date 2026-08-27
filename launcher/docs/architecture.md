@@ -15,6 +15,7 @@ flowchart LR
     Auth --> Microsoft[Microsoft device-code OAuth]
     Auth --> Xbox[Xbox Live and XSTS]
     Auth --> Minecraft[Minecraft Services]
+    Auth --> Telegram[Telegram nickname codes]
     Commands --> Distribution[Modpack distribution]
     Distribution --> Vanilla[Official client and Fabric]
     Vanilla --> Game[Game process]
@@ -41,16 +42,20 @@ the resulting authorization through Xbox Live, XSTS and Minecraft Services. The
 final profile request returns only the Minecraft player ID and name used by the
 UI.
 
-When Microsoft authentication is not used, manual nickname mode deliberately
-launches with the legacy offline identity (`UUID=0`, `accessToken=0`). This mode
-does not satisfy an online-mode server's authentication check.
+When Microsoft authentication is not used, Telegram nickname mode launches
+with the legacy offline identity (`UUID=0`, `accessToken=0`). The nick must
+already be bound through `@springauthbot`. This mode does not satisfy an
+online-mode server's authentication check.
 
 Tokens never cross the Tauri IPC boundary. `AuthState` retains the Minecraft
-access token, optional Microsoft refresh token and authenticated profile only
-in native process memory. The launch pipeline reads the Minecraft access token
-from that state to build the game arguments. The sign-out command clears this
-state. There is no session persistence in the current authentication
-implementation.
+access token, optional Microsoft refresh token and authenticated profile in
+native process memory. The same session is written to `session.toml` as a
+Windows DPAPI blob bound to the current user, so copying the file to another
+account or machine cannot restore it. Plaintext session files from older
+builds are rejected. Launch uses only that native session; the UI cannot
+supply a different nickname. Sign-out deletes the file. Telegram restores
+also re-check `launcher.php?nick=` and drop the session if the nick is no
+longer bound. If that check is unreachable, the local DPAPI session is kept.
 
 ## Frontend boundaries
 
@@ -62,7 +67,8 @@ implementation.
 - `src/shared/api`: the only module allowed to call Tauri `invoke`.
 
 The frontend receives the device-code challenge and the resulting Minecraft
-profile. It never receives any Microsoft, Xbox, XSTS or Minecraft access token.
+profile, including whether the account is Microsoft or Telegram. It never
+receives any Microsoft, Xbox, XSTS or Minecraft access token.
 It uses the profile name to fetch a rendered avatar from `mc-heads.net`; no
 authentication token is included in that request. A browser-only Vite preview
 degrades cleanly when the Tauri IPC bridge is unavailable.
@@ -133,18 +139,18 @@ and `-Xms` entries are dropped: the heap belongs to the player's settings.
 `prefs.toml` and `session.toml` are runtime files under Tauri's app-data
 directory. Files in `config/` document their schemas only. `prefs.toml` holds
 the distribution URL, the selected heap size and the optional mod choices;
-`session.toml` must never be committed, and its token type intentionally has no
+`session.toml` must never be committed. Its on-disk form is an encrypted
+envelope (`version` plus a hex DPAPI blob). The inner token type has no
 `Debug` implementation to reduce accidental logging.
 
 Configuration is parsed into typed Rust models and validated before use.
 User-facing errors should be mapped at the command boundary; low-level errors
 retain their source internally without exposing secrets.
 
-The Microsoft authentication path does not persist its session to
-`session.toml`. If persistent sessions are enabled later, the implementation
-must add operating system credential protection, explicit retention rules,
-migration behavior and updated user-facing privacy documentation before
-release.
+Microsoft and Telegram sessions both persist across restarts. Microsoft
+tokens are protected with `CryptProtectData` before they touch disk. Telegram
+sessions store only the confirmed nick inside that same protected envelope
+and are dropped if the auth bot reports the nick is unbound.
 
 ## Security defaults
 
@@ -152,6 +158,12 @@ release.
   client secret.
 - Authentication tokens remain in native Rust memory and are never returned to
   the Vue frontend.
+- Persistent sessions are encrypted with Windows DPAPI for the current user.
+  Copying `session.toml` to another Windows account does not restore the
+  session. Older plaintext session files are discarded.
+- Telegram nickname restores re-validate the binding with the auth bot.
+- The play command ignores any nickname from the UI and uses only the native
+  session.
 - The main WebView has a restrictive content security policy.
 - The main WebView capability grants only the listed Tauri core window actions;
   opening Microsoft's verification URL is initiated by the native command.

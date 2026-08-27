@@ -15,6 +15,7 @@ import {
   playGame,
   reinstallGame,
   signOut,
+  type AuthenticatedProfile,
 } from "@/shared/api/launcher";
 import {
   fitWindowToScreen,
@@ -25,6 +26,7 @@ import AppHeader from "@/widgets/AppHeader.vue";
 const screen = ref<AppScreen>("auth");
 const nickname = ref("");
 const authorized = ref(false);
+const authKind = ref<AuthenticatedProfile["kind"] | null>(null);
 const booting = ref(true);
 const launchBusy = ref(false);
 const gameRunning = ref(false);
@@ -66,8 +68,7 @@ async function restoreAuthentication(): Promise<void> {
   try {
     const profile = await getAuthenticatedProfile();
     if (profile) {
-      nickname.value = profile.name;
-      authorized.value = true;
+      applyProfile(profile);
       screen.value = "home";
     }
   } catch {
@@ -133,13 +134,22 @@ async function startGame(options: { reinstall?: boolean } = {}): Promise<void> {
 
   try {
     const result = options.reinstall
-      ? await reinstallGame(nickname.value)
-      : await playGame(nickname.value);
+      ? await reinstallGame()
+      : await playGame();
     needsDownload.value = false;
     remoteVersion.value = result.installedVersion;
   } catch (caught) {
-    launchError.value =
-      typeof caught === "string" ? caught : "Не удалось подготовить игру";
+    const message =
+      typeof caught === "string"
+        ? caught
+        : caught && typeof caught === "object" && "message" in caught
+          ? String((caught as { message: unknown }).message)
+          : "Не удалось подготовить игру";
+    if (message === "Сначала авторизуйтесь") {
+      await logout();
+      return;
+    }
+    launchError.value = message;
   } finally {
     try {
       applyLaunchStatus(await getLaunchStatus());
@@ -166,9 +176,14 @@ function applyLaunchStatus(status: LaunchStatus): void {
   }
 }
 
-function completeAuthorization(value: string, isAuthorized: boolean): void {
-  nickname.value = value;
-  authorized.value = isAuthorized;
+function applyProfile(profile: AuthenticatedProfile): void {
+  nickname.value = profile.name;
+  authorized.value = true;
+  authKind.value = profile.kind;
+}
+
+function completeAuthorization(profile: AuthenticatedProfile): void {
+  applyProfile(profile);
   screen.value = "home";
 }
 
@@ -180,6 +195,7 @@ async function logout(): Promise<void> {
   }
   nickname.value = "";
   authorized.value = false;
+  authKind.value = null;
   screen.value = "auth";
 }
 
@@ -198,6 +214,7 @@ function reinstallClient(): void {
         v-if="!booting && screen === 'home'"
         :nickname="nickname"
         :authorized="authorized"
+        :auth-kind="authKind"
         :busy="launchBusy"
         :game-running="gameRunning"
         :needs-download="needsDownload"

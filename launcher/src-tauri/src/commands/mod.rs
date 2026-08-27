@@ -7,7 +7,7 @@ use crate::{
     application::ArchitectureService,
     auth::{
         self, AuthState, AuthenticatedProfile, DeviceCodeChallenge, MicrosoftRestoreError,
-        NicknameChallenge,
+        NicknameChallenge, ProfileKind,
     },
     config::{SecretString, Session},
     distribution::{self, DistributionStatus, PlayResult},
@@ -94,11 +94,16 @@ async fn restore_auth(
     app: &AppHandle,
     state: &AuthState,
 ) -> Result<Option<AuthenticatedProfile>, String> {
+    let store = distribution::store(app)?;
     if let Some(profile) = state.profile()? {
+        if telegram_binding_revoked(&profile).await {
+            let _ = state.clear();
+            let _ = store.clear_session();
+            return Ok(None);
+        }
         return Ok(Some(profile));
     }
 
-    let store = distribution::store(app)?;
     let session = match store.load_session() {
         Ok(session) => session,
         Err(_) => {
@@ -113,6 +118,15 @@ async fn restore_auth(
     match session {
         Session::Telegram { player_name } => {
             if !auth::is_minecraft_nick(&player_name) {
+                let _ = store.clear_session();
+                return Ok(None);
+            }
+            let profile = AuthenticatedProfile {
+                id: String::new(),
+                name: player_name.clone(),
+                kind: ProfileKind::Telegram,
+            };
+            if telegram_binding_revoked(&profile).await {
                 let _ = store.clear_session();
                 return Ok(None);
             }
@@ -155,6 +169,7 @@ async fn restore_auth(
                         AuthenticatedProfile {
                             id: profile_id,
                             name: player_name,
+                            kind: ProfileKind::Microsoft,
                         },
                         access_token.expose_secret().to_string(),
                         refresh_token.map(|token| token.expose_secret().to_string()),
@@ -195,6 +210,16 @@ fn persist_microsoft_session(
 
 fn persist_error(_: crate::config::ConfigError) -> String {
     "Не удалось сохранить сессию входа".into()
+}
+
+async fn telegram_binding_revoked(profile: &AuthenticatedProfile) -> bool {
+    if profile.kind != ProfileKind::Telegram {
+        return false;
+    }
+    matches!(
+        auth::nickname_still_bound(&profile.name).await,
+        Ok(false)
+    )
 }
 
 #[tauri::command]
@@ -244,14 +269,12 @@ pub fn get_launch_status(state: State<'_, LaunchState>) -> LaunchStatus {
 #[tauri::command]
 pub async fn play_game(
     app: AppHandle,
-    nickname: String,
     auth_state: State<'_, AuthState>,
     launch_state: State<'_, LaunchState>,
 ) -> Result<PlayResult, String> {
-    let _ = nickname;
     restore_auth(&app, &auth_state).await?;
-    let permit = launch_state.try_acquire(app.clone())?;
     let identity = auth_state.launch_identity()?;
+    let permit = launch_state.try_acquire(app.clone())?;
     let store = distribution::store(&app)?;
     let mut preferences = store
         .load_preferences()
@@ -266,7 +289,6 @@ pub async fn play_game(
 #[tauri::command]
 pub async fn reinstall_game(
     app: AppHandle,
-    nickname: String,
     auth_state: State<'_, AuthState>,
     launch_state: State<'_, LaunchState>,
 ) -> Result<PlayResult, String> {
@@ -274,10 +296,9 @@ pub async fn reinstall_game(
         return Err("Закройте игру, чтобы переустановить клиент".into());
     }
 
-    let _ = nickname;
     restore_auth(&app, &auth_state).await?;
-    let permit = launch_state.try_acquire(app.clone())?;
     let identity = auth_state.launch_identity()?;
+    let permit = launch_state.try_acquire(app.clone())?;
     let store = distribution::store(&app)?;
     let mut preferences = store
         .load_preferences()
