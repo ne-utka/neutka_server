@@ -33,7 +33,7 @@ pub fn run() {
             commands::start_nickname_auth,
             commands::complete_nickname_auth,
             commands::get_authenticated_profile,
-            commands::sign_out_microsoft,
+            commands::sign_out,
             commands::get_distribution_status,
             commands::set_optional_mods,
             commands::set_memory_gb,

@@ -5,7 +5,11 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::{
     application::ArchitectureService,
-    auth::{self, AuthState, AuthenticatedProfile, DeviceCodeChallenge, NicknameChallenge},
+    auth::{
+        self, AuthState, AuthenticatedProfile, DeviceCodeChallenge, MicrosoftRestoreError,
+        NicknameChallenge,
+    },
+    config::{SecretString, Session},
     distribution::{self, DistributionStatus, PlayResult},
     domain::ArchitectureStatus,
     launch_state::{LaunchState, LaunchStatus},
@@ -34,6 +38,7 @@ pub async fn start_microsoft_auth(
 
 #[tauri::command]
 pub async fn complete_microsoft_auth(
+    app: AppHandle,
     device_code: String,
     interval: u64,
     expires_in: u64,
@@ -41,11 +46,7 @@ pub async fn complete_microsoft_auth(
 ) -> Result<AuthenticatedProfile, String> {
     let result =
         auth::complete_device_flow(&device_code, interval, expires_in).await?;
-    state.replace(
-        result.profile.clone(),
-        result.minecraft_access_token,
-        result.microsoft_refresh_token,
-    )?;
+    persist_microsoft_session(&app, &state, &result)?;
     Ok(result.profile)
 }
 
@@ -56,26 +57,144 @@ pub async fn start_nickname_auth(nick: String) -> Result<NicknameChallenge, Stri
 
 #[tauri::command]
 pub async fn complete_nickname_auth(
+    app: AppHandle,
     code: String,
     expires_in: u64,
+    state: State<'_, AuthState>,
 ) -> Result<AuthenticatedProfile, String> {
     let nick = auth::complete_nickname_auth(&code, expires_in).await?;
-    Ok(AuthenticatedProfile {
-        id: "0".into(),
-        name: nick,
-    })
+    let profile = state.replace_telegram(&nick)?;
+    let store = distribution::store(&app)?;
+    if let Err(error) = store.save_session(&Session::Telegram {
+        player_name: nick,
+    }) {
+        let _ = state.clear();
+        return Err(persist_error(error));
+    }
+    Ok(profile)
 }
 
 #[tauri::command]
-pub fn get_authenticated_profile(
+pub async fn get_authenticated_profile(
+    app: AppHandle,
     state: State<'_, AuthState>,
 ) -> Result<Option<AuthenticatedProfile>, String> {
-    state.profile()
+    restore_auth(&app, &state).await
 }
 
 #[tauri::command]
-pub fn sign_out_microsoft(state: State<'_, AuthState>) -> Result<(), String> {
-    state.clear()
+pub fn sign_out(app: AppHandle, state: State<'_, AuthState>) -> Result<(), String> {
+    state.clear()?;
+    distribution::store(&app)?
+        .clear_session()
+        .map_err(persist_error)
+}
+
+async fn restore_auth(
+    app: &AppHandle,
+    state: &AuthState,
+) -> Result<Option<AuthenticatedProfile>, String> {
+    if let Some(profile) = state.profile()? {
+        return Ok(Some(profile));
+    }
+
+    let store = distribution::store(app)?;
+    let session = match store.load_session() {
+        Ok(session) => session,
+        Err(_) => {
+            let _ = store.clear_session();
+            return Ok(None);
+        }
+    };
+    let Some(session) = session else {
+        return Ok(None);
+    };
+
+    match session {
+        Session::Telegram { player_name } => {
+            if !auth::is_minecraft_nick(&player_name) {
+                let _ = store.clear_session();
+                return Ok(None);
+            }
+            match state.replace_telegram(&player_name) {
+                Ok(profile) => Ok(Some(profile)),
+                Err(_) => {
+                    let _ = store.clear_session();
+                    Ok(None)
+                }
+            }
+        }
+        Session::Microsoft {
+            profile_id,
+            player_name,
+            access_token,
+            refresh_token,
+        } => {
+            match auth::restore_microsoft_session(
+                access_token.expose_secret(),
+                refresh_token
+                    .as_ref()
+                    .map(SecretString::expose_secret),
+            )
+            .await
+            {
+                Ok(result) => {
+                    persist_microsoft_session(app, state, &result)?;
+                    Ok(Some(result.profile))
+                }
+                Err(MicrosoftRestoreError::Expired) => {
+                    let _ = state.clear();
+                    let _ = store.clear_session();
+                    Ok(None)
+                }
+                Err(MicrosoftRestoreError::Unavailable) => {
+                    if player_name.is_empty() || profile_id.is_empty() {
+                        return Ok(None);
+                    }
+                    state.replace(
+                        AuthenticatedProfile {
+                            id: profile_id,
+                            name: player_name,
+                        },
+                        access_token.expose_secret().to_string(),
+                        refresh_token.map(|token| token.expose_secret().to_string()),
+                    )?;
+                    state.profile()
+                }
+            }
+        }
+    }
+}
+
+fn persist_microsoft_session(
+    app: &AppHandle,
+    state: &AuthState,
+    result: &auth::MicrosoftAuthResult,
+) -> Result<(), String> {
+    state.replace(
+        result.profile.clone(),
+        result.minecraft_access_token.clone(),
+        result.microsoft_refresh_token.clone(),
+    )?;
+    let store = distribution::store(app)?;
+    let saved = store.save_session(&Session::Microsoft {
+        profile_id: result.profile.id.clone(),
+        player_name: result.profile.name.clone(),
+        access_token: SecretString::new(result.minecraft_access_token.clone()),
+        refresh_token: result
+            .microsoft_refresh_token
+            .clone()
+            .map(SecretString::new),
+    });
+    if let Err(error) = saved {
+        let _ = state.clear();
+        return Err(persist_error(error));
+    }
+    Ok(())
+}
+
+fn persist_error(_: crate::config::ConfigError) -> String {
+    "Не удалось сохранить сессию входа".into()
 }
 
 #[tauri::command]
@@ -129,8 +248,10 @@ pub async fn play_game(
     auth_state: State<'_, AuthState>,
     launch_state: State<'_, LaunchState>,
 ) -> Result<PlayResult, String> {
+    let _ = nickname;
+    restore_auth(&app, &auth_state).await?;
     let permit = launch_state.try_acquire(app.clone())?;
-    let identity = auth_state.launch_identity(&nickname)?;
+    let identity = auth_state.launch_identity()?;
     let store = distribution::store(&app)?;
     let mut preferences = store
         .load_preferences()
@@ -153,8 +274,10 @@ pub async fn reinstall_game(
         return Err("Закройте игру, чтобы переустановить клиент".into());
     }
 
+    let _ = nickname;
+    restore_auth(&app, &auth_state).await?;
     let permit = launch_state.try_acquire(app.clone())?;
-    let identity = auth_state.launch_identity(&nickname)?;
+    let identity = auth_state.launch_identity()?;
     let store = distribution::store(&app)?;
     let mut preferences = store
         .load_preferences()

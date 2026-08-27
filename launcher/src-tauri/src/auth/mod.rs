@@ -14,6 +14,8 @@ const DEVICE_CODE_URL: &str =
 const TOKEN_URL: &str =
     "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
 const NICKNAME_AUTH_URL: &str = "https://springrp.ru/auth-bot/launcher.php";
+const OFFLINE_PROFILE_ID: &str = "00000000000000000000000000000000";
+const OFFLINE_ACCESS_TOKEN: &str = "0";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,7 +48,13 @@ pub struct AuthState {
     session: Mutex<Option<AuthSession>>,
 }
 
+enum AuthKind {
+    Telegram,
+    Microsoft,
+}
+
 struct AuthSession {
+    kind: AuthKind,
     profile: AuthenticatedProfile,
     minecraft_access_token: String,
     _microsoft_refresh_token: Option<String>,
@@ -66,7 +74,40 @@ impl AuthState {
         minecraft_access_token: String,
         microsoft_refresh_token: Option<String>,
     ) -> Result<(), String> {
+        self.replace_session(
+            AuthKind::Microsoft,
+            profile,
+            minecraft_access_token,
+            microsoft_refresh_token,
+        )
+    }
+
+    pub fn replace_telegram(&self, name: &str) -> Result<AuthenticatedProfile, String> {
+        if !is_minecraft_nick(name) {
+            return Err("Ник должен быть 3–16 символов: латиница, цифры и _".into());
+        }
+        let profile = AuthenticatedProfile {
+            id: OFFLINE_PROFILE_ID.into(),
+            name: name.to_string(),
+        };
+        self.replace_session(
+            AuthKind::Telegram,
+            profile.clone(),
+            OFFLINE_ACCESS_TOKEN.into(),
+            None,
+        )?;
+        Ok(profile)
+    }
+
+    fn replace_session(
+        &self,
+        kind: AuthKind,
+        profile: AuthenticatedProfile,
+        minecraft_access_token: String,
+        microsoft_refresh_token: Option<String>,
+    ) -> Result<(), String> {
         let session = AuthSession {
+            kind,
             profile,
             minecraft_access_token,
             _microsoft_refresh_token: microsoft_refresh_token,
@@ -97,30 +138,27 @@ impl AuthState {
             .map(|session| session.profile.clone()))
     }
 
-    pub fn launch_identity(&self, nickname: &str) -> Result<LaunchIdentity, String> {
+    pub fn launch_identity(&self) -> Result<LaunchIdentity, String> {
         let session = self
             .session
             .lock()
             .map_err(|_| "Не удалось прочитать сессию авторизации".to_string())?;
+        let session = session
+            .as_ref()
+            .ok_or_else(|| "Сначала авторизуйтесь".to_string())?;
 
-        if let Some(session) = session.as_ref() {
-            return Ok(LaunchIdentity {
+        match session.kind {
+            AuthKind::Telegram => Ok(LaunchIdentity {
+                name: session.profile.name.clone(),
+                uuid: hyphenate_uuid(OFFLINE_PROFILE_ID),
+                access_token: OFFLINE_ACCESS_TOKEN.into(),
+            }),
+            AuthKind::Microsoft => Ok(LaunchIdentity {
                 name: session.profile.name.clone(),
                 uuid: hyphenate_uuid(&session.profile.id),
                 access_token: session.minecraft_access_token.clone(),
-            });
+            }),
         }
-
-        let name = nickname.trim();
-        if name.is_empty() {
-            return Err("Сначала введите ник или авторизуйтесь".into());
-        }
-
-        Ok(LaunchIdentity {
-            name: name.to_string(),
-            uuid: "00000000-0000-0000-0000-000000000000".into(),
-            access_token: "0".into(),
-        })
     }
 }
 
@@ -218,13 +256,54 @@ pub async fn complete_device_flow(
     let client = Client::new();
     let microsoft_token =
         poll_microsoft_token(&client, device_code, interval, expires_in).await?;
+    minecraft_session_from_microsoft_token(&client, microsoft_token).await
+}
+
+pub enum MicrosoftRestoreError {
+    Expired,
+    Unavailable,
+}
+
+pub async fn restore_microsoft_session(
+    access_token: &str,
+    refresh_token: Option<&str>,
+) -> Result<MicrosoftAuthResult, MicrosoftRestoreError> {
+    let client = Client::new();
+    if let Some(refresh) = refresh_token.filter(|value| !value.is_empty()) {
+        match refresh_microsoft_token(&client, refresh).await {
+            Ok(token) => {
+                return minecraft_session_from_microsoft_token(&client, token)
+                    .await
+                    .map_err(|_| MicrosoftRestoreError::Unavailable);
+            }
+            Err(MicrosoftRestoreError::Expired) => {
+                return Err(MicrosoftRestoreError::Expired);
+            }
+            Err(MicrosoftRestoreError::Unavailable) => {}
+        }
+    }
+
+    match load_minecraft_profile(&client, access_token).await {
+        Ok(profile) => Ok(MicrosoftAuthResult {
+            profile,
+            minecraft_access_token: access_token.to_string(),
+            microsoft_refresh_token: refresh_token.map(str::to_owned),
+        }),
+        Err(error) if error == "expired" => Err(MicrosoftRestoreError::Expired),
+        Err(_) => Err(MicrosoftRestoreError::Unavailable),
+    }
+}
+
+async fn minecraft_session_from_microsoft_token(
+    client: &Client,
+    microsoft_token: MicrosoftTokenResponse,
+) -> Result<MicrosoftAuthResult, String> {
     let (xbox_token, _) =
-        authenticate_xbox_live(&client, &microsoft_token.access_token).await?;
-    let (xsts_token, user_hash) = authorize_xsts(&client, &xbox_token).await?;
+        authenticate_xbox_live(client, &microsoft_token.access_token).await?;
+    let (xsts_token, user_hash) = authorize_xsts(client, &xbox_token).await?;
     let minecraft_access_token =
-        authenticate_minecraft(&client, &user_hash, &xsts_token).await?;
-    let profile =
-        load_minecraft_profile(&client, &minecraft_access_token).await?;
+        authenticate_minecraft(client, &user_hash, &xsts_token).await?;
+    let profile = load_minecraft_profile(client, &minecraft_access_token).await?;
 
     Ok(MicrosoftAuthResult {
         profile,
@@ -294,6 +373,40 @@ async fn poll_microsoft_token(
     }
 
     Err("Время ожидания авторизации Microsoft истекло".into())
+}
+
+async fn refresh_microsoft_token(
+    client: &Client,
+    refresh_token: &str,
+) -> Result<MicrosoftTokenResponse, MicrosoftRestoreError> {
+    let response = client
+        .post(TOKEN_URL)
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("client_id", CLIENT_ID),
+            ("refresh_token", refresh_token),
+            ("scope", MICROSOFT_SCOPE),
+        ])
+        .send()
+        .await
+        .map_err(|_| MicrosoftRestoreError::Unavailable)?;
+
+    let status = response.status();
+    let payload: Value = response
+        .json()
+        .await
+        .map_err(|_| MicrosoftRestoreError::Unavailable)?;
+
+    if status.is_success() {
+        return serde_json::from_value(payload).map_err(|_| MicrosoftRestoreError::Unavailable);
+    }
+
+    match payload.get("error").and_then(Value::as_str) {
+        Some("invalid_grant") | Some("expired_token") | Some("code_expired") => {
+            Err(MicrosoftRestoreError::Expired)
+        }
+        _ => Err(MicrosoftRestoreError::Unavailable),
+    }
 }
 
 async fn authenticate_xbox_live(
@@ -419,6 +532,9 @@ async fn load_minecraft_profile(
     if response.status() == StatusCode::NOT_FOUND {
         return Err("На аккаунте нет приобретённой Minecraft: Java Edition".into());
     }
+    if response.status() == StatusCode::UNAUTHORIZED {
+        return Err("expired".into());
+    }
     if !response.status().is_success() {
         return Err(api_error("Minecraft Profile", response).await);
     }
@@ -533,7 +649,7 @@ pub async fn complete_nickname_auth(
     }
 }
 
-fn is_minecraft_nick(value: &str) -> bool {
+pub(crate) fn is_minecraft_nick(value: &str) -> bool {
     let len = value.len();
     (3..=16).contains(&len) && value.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
 }
@@ -555,9 +671,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn launch_without_microsoft_session_uses_offline_identity() {
+    fn launch_without_session_requires_authorization() {
         let state = AuthState::default();
-        let identity = state.launch_identity("OfflineName").unwrap();
+        let error = state.launch_identity().unwrap_err();
+        assert_eq!(error, "Сначала авторизуйтесь");
+    }
+
+    #[test]
+    fn launch_telegram_session_uses_offline_identity() {
+        let state = AuthState::default();
+        let profile = state.replace_telegram("OfflineName").unwrap();
+        assert_eq!(profile.name, "OfflineName");
+
+        let identity = state.launch_identity().unwrap();
         assert_eq!(identity.name, "OfflineName");
         assert_eq!(identity.uuid, "00000000-0000-0000-0000-000000000000");
         assert_eq!(identity.access_token, "0");
@@ -577,7 +703,7 @@ mod tests {
             )
             .unwrap();
 
-        let identity = state.launch_identity("IgnoredName").unwrap();
+        let identity = state.launch_identity().unwrap();
         assert_eq!(identity.name, "SpringPlayer");
         assert_eq!(identity.uuid, "12345678-1234-1234-1234-1234567890ab");
         assert_eq!(identity.access_token, "minecraft-token");

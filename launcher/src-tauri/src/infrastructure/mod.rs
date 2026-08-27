@@ -58,8 +58,29 @@ impl TomlConfigStore {
         self.write_toml("prefs.toml", preferences)
     }
 
-    pub fn load_session(&self) -> Result<Session, ConfigError> {
-        self.read_toml("session.toml")
+    pub fn load_session(&self) -> Result<Option<Session>, ConfigError> {
+        match self.read_toml("session.toml") {
+            Ok(session) => Ok(Some(session)),
+            Err(ConfigError::Read(error))
+                if error.kind() == std::io::ErrorKind::NotFound =>
+            {
+                Ok(None)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    pub fn save_session(&self, session: &Session) -> Result<(), ConfigError> {
+        self.write_toml("session.toml", session)
+    }
+
+    pub fn clear_session(&self) -> Result<(), ConfigError> {
+        let path = self.app_data_dir.join("session.toml");
+        match fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(ConfigError::Write(error)),
+        }
     }
 
     fn read_toml<T: DeserializeOwned>(&self, name: &str) -> Result<T, ConfigError> {
@@ -121,4 +142,36 @@ impl JavaHelperAdapter {
 
 fn path_argument(path: &Path) -> String {
     path.to_string_lossy().into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TomlConfigStore;
+    use crate::config::Session;
+
+    #[test]
+    fn session_survives_restart_and_clears_on_logout() {
+        let root = std::env::temp_dir().join(format!(
+            "springrp-session-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let store = TomlConfigStore::new(root.clone());
+
+        store
+            .save_session(&Session::Telegram {
+                player_name: "Steve".into(),
+            })
+            .unwrap();
+        let restored = store.load_session().unwrap().unwrap();
+        match restored {
+            Session::Telegram { player_name } => assert_eq!(player_name, "Steve"),
+            Session::Microsoft { .. } => panic!("expected telegram session"),
+        }
+
+        store.clear_session().unwrap();
+        assert!(store.load_session().unwrap().is_none());
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }

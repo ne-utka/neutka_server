@@ -144,8 +144,8 @@ export function getAuthenticatedProfile(): Promise<AuthenticatedProfile | null> 
   return invoke<AuthenticatedProfile | null>("get_authenticated_profile");
 }
 
-export function signOutMicrosoft(): Promise<void> {
-  return invoke("sign_out_microsoft");
+export function signOut(): Promise<void> {
+  return invoke("sign_out");
 }
 
 export function getDistributionStatus(): Promise<DistributionStatus> {

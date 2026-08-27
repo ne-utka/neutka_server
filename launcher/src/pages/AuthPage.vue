@@ -242,7 +242,7 @@ async function copyDisplayedCode(value: string | undefined): Promise<void> {
         aria-label="Скопировать код Microsoft"
         @click="copyDisplayedCode(challenge.userCode)"
       >
-        {{ challenge.userCode }}
+        <span>{{ challenge.userCode }}</span>
       </button>
       <p v-if="challenge && !oauthError">
         {{ codeCopied ? "(скопировано)" : "Введите этот код на странице Microsoft" }}
@@ -283,7 +283,7 @@ async function copyDisplayedCode(value: string | undefined): Promise<void> {
         aria-label="Скопировать код"
         @click="copyDisplayedCode(nickChallenge.userCode)"
       >
-        {{ nickChallenge.userCode }}
+        <span>{{ nickChallenge.userCode }}</span>
       </button>
       <p v-if="nickChallenge && nickWaiting">
         {{
@@ -453,6 +453,9 @@ input:focus {
 }
 
 .microsoft-status .microsoft-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-top: 16px;
   padding: 12px 18px;
   color: #fff;
@@ -462,7 +465,12 @@ input:focus {
   font-family: "Inter Variable", Inter, sans-serif;
   font-size: 24px;
   font-weight: 700;
+  text-align: center;
+}
+
+.microsoft-status .microsoft-code span {
   letter-spacing: 0.14em;
+  margin-inline-end: -0.14em;
 }
 
 .microsoft-status .microsoft-code:hover {

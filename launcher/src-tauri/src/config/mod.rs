@@ -6,6 +6,10 @@ use thiserror::Error;
 pub struct SecretString(String);
 
 impl SecretString {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
     pub fn expose_secret(&self) -> &str {
         &self.0
     }
@@ -51,10 +55,18 @@ impl Preferences {
 }
 
 #[derive(Clone, Deserialize, Serialize)]
-pub struct Session {
-    pub profile_id: String,
-    pub player_name: String,
-    pub access_token: SecretString,
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Session {
+    Telegram {
+        player_name: String,
+    },
+    Microsoft {
+        profile_id: String,
+        player_name: String,
+        access_token: SecretString,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        refresh_token: Option<SecretString>,
+    },
 }
 
 #[derive(Debug, Error)]
@@ -69,4 +81,34 @@ pub enum ConfigError {
     Serialize(#[source] toml::ser::Error),
     #[error("configuration is invalid: {0}")]
     Validation(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SecretString, Session};
+
+    #[test]
+    fn telegram_session_roundtrips() {
+        let encoded = toml::to_string_pretty(&Session::Telegram {
+            player_name: "Steve".into(),
+        })
+        .unwrap();
+        let decoded: Session = toml::from_str(&encoded).unwrap();
+        match decoded {
+            Session::Telegram { player_name } => assert_eq!(player_name, "Steve"),
+            Session::Microsoft { .. } => panic!("expected telegram session"),
+        }
+    }
+
+    #[test]
+    fn microsoft_session_hides_optional_refresh_when_missing() {
+        let encoded = toml::to_string_pretty(&Session::Microsoft {
+            profile_id: "abc".into(),
+            player_name: "Steve".into(),
+            access_token: SecretString::new("token"),
+            refresh_token: None,
+        })
+        .unwrap();
+        assert!(!encoded.contains("refresh_token"));
+    }
 }

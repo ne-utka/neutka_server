@@ -14,7 +14,7 @@ import {
   getLaunchStatus,
   playGame,
   reinstallGame,
-  signOutMicrosoft,
+  signOut,
 } from "@/shared/api/launcher";
 import {
   fitWindowToScreen,
@@ -25,6 +25,7 @@ import AppHeader from "@/widgets/AppHeader.vue";
 const screen = ref<AppScreen>("auth");
 const nickname = ref("");
 const authorized = ref(false);
+const booting = ref(true);
 const launchBusy = ref(false);
 const gameRunning = ref(false);
 const launchProgress = ref<DownloadProgress | null>(null);
@@ -47,8 +48,7 @@ watch(
 );
 
 onMounted(() => {
-  void restoreAuthentication();
-  void initializeLaunchTracking();
+  void boot();
 });
 
 onUnmounted(() => {
@@ -56,12 +56,19 @@ onUnmounted(() => {
   void unlistenLaunchState?.();
 });
 
+async function boot(): Promise<void> {
+  await restoreAuthentication();
+  booting.value = false;
+  await initializeLaunchTracking();
+}
+
 async function restoreAuthentication(): Promise<void> {
   try {
     const profile = await getAuthenticatedProfile();
     if (profile) {
       nickname.value = profile.name;
       authorized.value = true;
+      screen.value = "home";
     }
   } catch {
     // Browser-only preview has no Tauri IPC bridge.
@@ -166,13 +173,12 @@ function completeAuthorization(value: string, isAuthorized: boolean): void {
 }
 
 async function logout(): Promise<void> {
-  if (authorized.value) {
-    try {
-      await signOutMicrosoft();
-    } catch {
-      // Clear the local UI state even if the backend session is already gone.
-    }
+  try {
+    await signOut();
+  } catch {
+    // Clear the local UI state even if the backend session is already gone.
   }
+  nickname.value = "";
   authorized.value = false;
   screen.value = "auth";
 }
@@ -189,7 +195,7 @@ function reinstallClient(): void {
     <AppHeader :screen="screen" @back="screen = 'home'" />
     <main class="app-content">
       <HomePage
-        v-if="screen === 'home'"
+        v-if="!booting && screen === 'home'"
         :nickname="nickname"
         :authorized="authorized"
         :busy="launchBusy"
@@ -204,11 +210,11 @@ function reinstallClient(): void {
         @settings="screen = 'settings'"
       />
       <AuthPage
-        v-else-if="screen === 'auth'"
+        v-else-if="!booting && screen === 'auth'"
         @complete="completeAuthorization"
       />
       <SettingsPage
-        v-else
+        v-else-if="!booting"
         :busy="launchBusy"
         :game-running="gameRunning"
         @reinstall="reinstallClient"
