@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+
+const REFRESH_INTERVAL_MS = 60_000;
 
 const props = defineProps<{ nickname: string }>();
 const avatarUrl = ref<string | null>(null);
@@ -7,64 +9,106 @@ const state = ref<"loading" | "loaded" | "error">("loading");
 
 let activeController: AbortController | null = null;
 let activeObjectUrl: string | null = null;
+let refreshTimer = 0;
 
-function resetRequest(): void {
+function abortActiveRequest(): void {
   activeController?.abort();
   activeController = null;
+}
 
+function revokeObjectUrl(): void {
   if (activeObjectUrl) {
     URL.revokeObjectURL(activeObjectUrl);
     activeObjectUrl = null;
   }
+}
 
+function resetRequest(): void {
+  abortActiveRequest();
+  revokeObjectUrl();
   avatarUrl.value = null;
+}
+
+async function loadAvatar(options: { showLoading: boolean }): Promise<void> {
+  const nickname = props.nickname.trim();
+  abortActiveRequest();
+
+  if (options.showLoading) {
+    revokeObjectUrl();
+    avatarUrl.value = null;
+    state.value = "loading";
+  }
+
+  if (!nickname) {
+    if (options.showLoading || !avatarUrl.value) {
+      state.value = "error";
+    }
+    return;
+  }
+
+  const controller = new AbortController();
+  activeController = controller;
+
+  try {
+    const response = await fetch(
+      `https://mc-heads.net/avatar/${encodeURIComponent(nickname)}/64?t=${Date.now()}`,
+      {
+        cache: "no-store",
+        signal: controller.signal,
+      },
+    );
+
+    if (!response.ok) throw new Error(`Avatar API returned ${response.status}`);
+
+    const blob = await response.blob();
+    if (!blob.type.startsWith("image/")) {
+      throw new Error("Avatar API did not return an image");
+    }
+
+    const nextObjectUrl = URL.createObjectURL(blob);
+    const previousObjectUrl = activeObjectUrl;
+    activeObjectUrl = nextObjectUrl;
+    avatarUrl.value = nextObjectUrl;
+    state.value = "loaded";
+    if (previousObjectUrl) URL.revokeObjectURL(previousObjectUrl);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return;
+    }
+    if (options.showLoading || !avatarUrl.value) {
+      state.value = "error";
+    }
+    console.warn("Unable to load player avatar", error);
+  } finally {
+    if (activeController === controller) activeController = null;
+  }
+}
+
+function refreshInBackground(): void {
+  if (document.visibilityState === "hidden") return;
+  void loadAvatar({ showLoading: false });
 }
 
 watch(
   () => props.nickname,
-  async (nickname) => {
-    resetRequest();
-    state.value = "loading";
-    if (!nickname.trim()) {
-      state.value = "error";
-      return;
-    }
-
-    const controller = new AbortController();
-    activeController = controller;
-
-    try {
-      const response = await fetch(
-        `https://mc-heads.net/avatar/${encodeURIComponent(nickname)}/64`,
-        {
-          cache: "force-cache",
-          signal: controller.signal,
-        },
-      );
-
-      if (!response.ok) throw new Error(`Avatar API returned ${response.status}`);
-
-      const blob = await response.blob();
-      if (!blob.type.startsWith("image/")) {
-        throw new Error("Avatar API did not return an image");
-      }
-
-      activeObjectUrl = URL.createObjectURL(blob);
-      avatarUrl.value = activeObjectUrl;
-      state.value = "loaded";
-    } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
-        state.value = "error";
-        console.warn("Unable to load player avatar", error);
-      }
-    } finally {
-      if (activeController === controller) activeController = null;
-    }
+  () => {
+    void loadAvatar({ showLoading: true });
   },
   { immediate: true },
 );
 
-onBeforeUnmount(resetRequest);
+onMounted(() => {
+  window.addEventListener("focus", refreshInBackground);
+  document.addEventListener("visibilitychange", refreshInBackground);
+  refreshTimer = window.setInterval(refreshInBackground, REFRESH_INTERVAL_MS);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("focus", refreshInBackground);
+  document.removeEventListener("visibilitychange", refreshInBackground);
+  window.clearInterval(refreshTimer);
+  resetRequest();
+});
 </script>
 
 <template>
