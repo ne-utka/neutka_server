@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { DownloadProgress } from "@/entities/launcher/model";
-import { openGameFolder, type AuthProvider } from "@/shared/api/launcher";
+import { openGameFolder } from "@/shared/api/launcher";
 import AppIcon from "@/shared/ui/AppIcon.vue";
 import PlayerAvatar from "@/shared/ui/PlayerAvatar.vue";
 
 const props = defineProps<{
   nickname: string;
   authorized: boolean;
-  authProvider: AuthProvider | null;
+  authKind: "microsoft" | "telegram" | null;
   busy: boolean;
   gameRunning: boolean;
   needsDownload: boolean;
@@ -21,11 +21,11 @@ defineEmits<{ play: []; logout: []; settings: [] }>();
 
 const folderError = ref<string | null>(null);
 const displayError = computed(() => folderError.value ?? props.error);
-
-const authLabel = computed(() => {
-  if (props.authProvider === "microsoft") return "Аккаунт Microsoft";
-  if (props.authProvider === "telegram") return "Вход через Telegram";
-  return props.authorized ? "Авторизован" : "Не авторизован";
+const accountLabel = computed(() => {
+  if (!props.authorized) return "Не авторизован";
+  return props.authKind === "microsoft"
+    ? "Аккаунт Microsoft"
+    : "Вход через Telegram";
 });
 
 const playLabel = computed(() => {
@@ -74,7 +74,7 @@ async function openFolder(): Promise<void> {
       <PlayerAvatar :nickname="nickname" />
       <div class="profile-copy">
         <strong>{{ nickname }}</strong>
-        <span>{{ authLabel }}</span>
+        <span>{{ accountLabel }}</span>
       </div>
       <button
         class="logout-button"

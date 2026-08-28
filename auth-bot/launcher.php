@@ -17,6 +17,24 @@ if (($_SERVER["REQUEST_METHOD"] ?? "") === "OPTIONS") {
 }
 
 if (($_SERVER["REQUEST_METHOD"] ?? "") === "GET") {
+    $nick = trim((string) ($_GET["nick"] ?? ""));
+    if ($nick !== "") {
+        if (!preg_match("/^[A-Za-z0-9_]{3,16}$/", $nick)) {
+            http_response_code(400);
+            echo json_encode(["ok" => false, "error" => "bad_nick"], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $bound = bound_player($nick);
+        if ($bound === null) {
+            echo json_encode(["ok" => false, "error" => "not_bound"], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        echo json_encode([
+            "ok" => true,
+            "nick" => (string) ($bound["nick"] ?? $nick),
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     $code = (string) ($_GET["code"] ?? "");
     echo json_encode(login_code_status($code), JSON_UNESCAPED_UNICODE);
     exit;

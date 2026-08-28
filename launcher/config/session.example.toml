@@ -1,4 +1,5 @@
 # Example shape only. Never commit a real session.toml.
-profile_id = "00000000-0000-0000-0000-000000000000"
-player_name = "Player"
-access_token = "runtime-secret"
+# The launcher writes an encrypted envelope, not this inner document.
+
+version = 1
+protected = "dpapi-hex-blob-bound-to-the-windows-user"

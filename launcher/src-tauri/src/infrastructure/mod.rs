@@ -3,12 +3,23 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     config::{ConfigError, Preferences, Session},
     launcher::{LaunchError, LaunchRequest, PreparedLaunch},
 };
+
+mod protect;
+
+const SESSION_FILE: &str = "session.toml";
+const SESSION_VERSION: u32 = 1;
+
+#[derive(Serialize, Deserialize)]
+struct ProtectedSessionFile {
+    version: u32,
+    protected: String,
+}
 
 /// Filesystem adapter rooted at Tauri's app-data directory.
 pub struct TomlConfigStore {
@@ -59,8 +70,17 @@ impl TomlConfigStore {
     }
 
     pub fn load_session(&self) -> Result<Option<Session>, ConfigError> {
-        match self.read_toml("session.toml") {
-            Ok(session) => Ok(Some(session)),
+        match self.read_toml::<ProtectedSessionFile>(SESSION_FILE) {
+            Ok(envelope) => {
+                if envelope.version != SESSION_VERSION {
+                    return Err(ConfigError::Unprotect);
+                }
+                let blob = hex::decode(envelope.protected.trim())
+                    .map_err(|_| ConfigError::Unprotect)?;
+                let plain = protect::unprotect(&blob)?;
+                let encoded = String::from_utf8(plain).map_err(|_| ConfigError::Unprotect)?;
+                toml::from_str(&encoded).map_err(ConfigError::Parse).map(Some)
+            }
             Err(ConfigError::Read(error))
                 if error.kind() == std::io::ErrorKind::NotFound =>
             {
@@ -71,11 +91,19 @@ impl TomlConfigStore {
     }
 
     pub fn save_session(&self, session: &Session) -> Result<(), ConfigError> {
-        self.write_toml("session.toml", session)
+        let plain = toml::to_string(session).map_err(ConfigError::Serialize)?;
+        let blob = protect::protect(plain.as_bytes())?;
+        self.write_toml(
+            SESSION_FILE,
+            &ProtectedSessionFile {
+                version: SESSION_VERSION,
+                protected: hex::encode(blob),
+            },
+        )
     }
 
     pub fn clear_session(&self) -> Result<(), ConfigError> {
-        let path = self.app_data_dir.join("session.toml");
+        let path = self.app_data_dir.join(SESSION_FILE);
         match fs::remove_file(&path) {
             Ok(()) => Ok(()),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -170,8 +198,32 @@ mod tests {
             Session::Microsoft { .. } => panic!("expected telegram session"),
         }
 
+        let on_disk = std::fs::read_to_string(root.join("session.toml")).unwrap();
+        assert!(!on_disk.contains("Steve"));
+        assert!(!on_disk.contains("telegram"));
+        assert!(on_disk.contains("protected"));
+
         store.clear_session().unwrap();
         assert!(store.load_session().unwrap().is_none());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn plaintext_session_files_are_rejected() {
+        let root = std::env::temp_dir().join(format!(
+            "springrp-session-plain-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(
+            root.join("session.toml"),
+            "kind = \"telegram\"\nplayer_name = \"Steve\"\n",
+        )
+        .unwrap();
+
+        let store = TomlConfigStore::new(root.clone());
+        assert!(store.load_session().is_err());
         let _ = std::fs::remove_dir_all(&root);
     }
 }

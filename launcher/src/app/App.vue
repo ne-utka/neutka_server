@@ -16,7 +16,6 @@ import {
   reinstallGame,
   signOut,
   type AuthenticatedProfile,
-  type AuthProvider,
 } from "@/shared/api/launcher";
 import {
   fitWindowToScreen,
@@ -27,7 +26,7 @@ import AppHeader from "@/widgets/AppHeader.vue";
 const screen = ref<AppScreen>("auth");
 const nickname = ref("");
 const authorized = ref(false);
-const authProvider = ref<AuthProvider | null>(null);
+const authKind = ref<AuthenticatedProfile["kind"] | null>(null);
 const booting = ref(true);
 const launchBusy = ref(false);
 const gameRunning = ref(false);
@@ -134,13 +133,22 @@ async function startGame(options: { reinstall?: boolean } = {}): Promise<void> {
 
   try {
     const result = options.reinstall
-      ? await reinstallGame(nickname.value)
-      : await playGame(nickname.value);
+      ? await reinstallGame()
+      : await playGame();
     needsDownload.value = false;
     remoteVersion.value = result.installedVersion;
   } catch (caught) {
-    launchError.value =
-      typeof caught === "string" ? caught : "Не удалось подготовить игру";
+    const message =
+      typeof caught === "string"
+        ? caught
+        : caught && typeof caught === "object" && "message" in caught
+          ? String((caught as { message: unknown }).message)
+          : "Не удалось подготовить игру";
+    if (message === "Сначала авторизуйтесь") {
+      await logout();
+      return;
+    }
+    launchError.value = message;
   } finally {
     try {
       applyLaunchStatus(await getLaunchStatus());
@@ -170,16 +178,8 @@ function applyLaunchStatus(status: LaunchStatus): void {
 function applyProfile(profile: AuthenticatedProfile): void {
   nickname.value = profile.name;
   authorized.value = true;
-  authProvider.value = resolveAuthProvider(profile);
+  authKind.value = profile.kind;
   screen.value = "home";
-}
-
-function resolveAuthProvider(profile: AuthenticatedProfile): AuthProvider {
-  if (profile.kind === "telegram" || profile.kind === "microsoft") {
-    return profile.kind;
-  }
-  const compact = profile.id.replaceAll("-", "");
-  return compact === "0".repeat(32) || compact === "0" ? "telegram" : "microsoft";
 }
 
 function completeAuthorization(profile: AuthenticatedProfile): void {
@@ -194,7 +194,7 @@ async function logout(): Promise<void> {
   }
   nickname.value = "";
   authorized.value = false;
-  authProvider.value = null;
+  authKind.value = null;
   screen.value = "auth";
 }
 
@@ -213,7 +213,7 @@ function reinstallClient(): void {
         v-if="!booting && screen === 'home'"
         :nickname="nickname"
         :authorized="authorized"
-        :auth-provider="authProvider"
+        :auth-kind="authKind"
         :busy="launchBusy"
         :game-running="gameRunning"
         :needs-download="needsDownload"

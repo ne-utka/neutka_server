@@ -22,12 +22,10 @@ export interface NicknameChallenge {
   expiresIn: number;
 }
 
-export type AuthProvider = "microsoft" | "telegram";
-
 export interface AuthenticatedProfile {
   id: string;
   name: string;
-  kind?: AuthProvider;
+  kind: "microsoft" | "telegram";
 }
 
 const NICKNAME_AUTH_URL = "https://springrp.ru/auth-bot/launcher.php";
@@ -89,7 +87,11 @@ async function completeNicknameAuthInBrowser(
       nick?: string;
     };
     if (payload.status === "verified") {
-      return { id: "0", name: payload.nick || challenge.nick, kind: "telegram" };
+      return {
+        id: "0",
+        name: payload.nick || challenge.nick,
+        kind: "telegram",
+      };
     }
     if (payload.status === "expired") {
       throw "Код истёк. Нажмите «Продолжить» ещё раз";
@@ -167,12 +169,12 @@ export function getLaunchStatus(): Promise<LaunchStatus> {
   return invoke<LaunchStatus>("get_launch_status");
 }
 
-export function playGame(nickname: string): Promise<PlayResult> {
-  return invoke<PlayResult>("play_game", { nickname });
+export function playGame(): Promise<PlayResult> {
+  return invoke<PlayResult>("play_game");
 }
 
-export function reinstallGame(nickname: string): Promise<PlayResult> {
-  return invoke<PlayResult>("reinstall_game", { nickname });
+export function reinstallGame(): Promise<PlayResult> {
+  return invoke<PlayResult>("reinstall_game");
 }
 
 export function openGameFolder(): Promise<void> {
