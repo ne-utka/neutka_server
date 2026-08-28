@@ -1,6 +1,6 @@
 [package]
 name = "springrp-launcher"
-version = "0.1.2",
+version = "0.1.2"
 description = "Windows desktop shell for SpringRP"
 authors = ["SpringRP contributors"]
 edition = "2021"
