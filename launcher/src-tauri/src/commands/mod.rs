@@ -155,6 +155,7 @@ async fn restore_auth(
                         AuthenticatedProfile {
                             id: profile_id,
                             name: player_name,
+                            kind: auth::AuthProvider::Microsoft,
                         },
                         access_token.expose_secret().to_string(),
                         refresh_token.map(|token| token.expose_secret().to_string()),

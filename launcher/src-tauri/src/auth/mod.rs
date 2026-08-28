@@ -37,10 +37,20 @@ pub struct NicknameChallenge {
     pub expires_in: u64,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum AuthProvider {
+    #[default]
+    Microsoft,
+    Telegram,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthenticatedProfile {
     pub id: String,
     pub name: String,
+    #[serde(default)]
+    pub kind: AuthProvider,
 }
 
 #[derive(Default)]
@@ -89,6 +99,7 @@ impl AuthState {
         let profile = AuthenticatedProfile {
             id: OFFLINE_PROFILE_ID.into(),
             name: name.to_string(),
+            kind: AuthProvider::Telegram,
         };
         self.replace_session(
             AuthKind::Telegram,
@@ -285,7 +296,11 @@ pub async fn restore_microsoft_session(
 
     match load_minecraft_profile(&client, access_token).await {
         Ok(profile) => Ok(MicrosoftAuthResult {
-            profile,
+            profile: AuthenticatedProfile {
+                id: profile.id,
+                name: profile.name,
+                kind: AuthProvider::Microsoft,
+            },
             minecraft_access_token: access_token.to_string(),
             microsoft_refresh_token: refresh_token.map(str::to_owned),
         }),
@@ -303,10 +318,15 @@ async fn minecraft_session_from_microsoft_token(
     let (xsts_token, user_hash) = authorize_xsts(client, &xbox_token).await?;
     let minecraft_access_token =
         authenticate_minecraft(client, &user_hash, &xsts_token).await?;
-    let profile = load_minecraft_profile(client, &minecraft_access_token).await?;
+    let profile =
+        load_minecraft_profile(client, &minecraft_access_token).await?;
 
     Ok(MicrosoftAuthResult {
-        profile,
+        profile: AuthenticatedProfile {
+            id: profile.id,
+            name: profile.name,
+            kind: AuthProvider::Microsoft,
+        },
         minecraft_access_token,
         microsoft_refresh_token: microsoft_token.refresh_token,
     })
@@ -682,6 +702,7 @@ mod tests {
         let state = AuthState::default();
         let profile = state.replace_telegram("OfflineName").unwrap();
         assert_eq!(profile.name, "OfflineName");
+        assert_eq!(profile.kind, AuthProvider::Telegram);
 
         let identity = state.launch_identity().unwrap();
         assert_eq!(identity.name, "OfflineName");
@@ -697,6 +718,7 @@ mod tests {
                 AuthenticatedProfile {
                     id: "123456781234123412341234567890ab".into(),
                     name: "SpringPlayer".into(),
+                    kind: AuthProvider::Microsoft,
                 },
                 "minecraft-token".into(),
                 None,

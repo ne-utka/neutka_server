@@ -5,6 +5,7 @@ import {
   completeNicknameAuth,
   startMicrosoftAuth,
   startNicknameAuth,
+  type AuthenticatedProfile,
   type DeviceCodeChallenge,
   type NicknameChallenge,
 } from "@/shared/api/launcher";
@@ -14,7 +15,7 @@ import {
 } from "@/shared/lib/window";
 
 const emit = defineEmits<{
-  complete: [nickname: string, authorized: boolean];
+  complete: [profile: AuthenticatedProfile];
 }>();
 const nickname = ref("");
 const microsoftLoading = ref(false);
@@ -63,7 +64,7 @@ async function continueWithNickname(): Promise<void> {
     nickChallenge.value = nextChallenge;
     const profile = await completeNicknameAuth(nextChallenge);
     if (attempt !== nickAttempt) return;
-    emit("complete", profile.name, true);
+    emit("complete", profile);
   } catch (error) {
     if (attempt !== nickAttempt) return;
     const message = errorText(error, "Не удалось войти по нику");
@@ -97,7 +98,7 @@ async function authorizeMicrosoft(): Promise<void> {
     challenge.value = deviceChallenge;
     const profile = await completeMicrosoftAuth(deviceChallenge);
     if (attempt !== microsoftAttempt) return;
-    emit("complete", profile.name, true);
+    emit("complete", profile);
   } catch (error) {
     if (attempt !== microsoftAttempt) return;
     oauthError.value = errorText(

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { DownloadProgress } from "@/entities/launcher/model";
-import { openGameFolder } from "@/shared/api/launcher";
+import { openGameFolder, type AuthProvider } from "@/shared/api/launcher";
 import AppIcon from "@/shared/ui/AppIcon.vue";
 import PlayerAvatar from "@/shared/ui/PlayerAvatar.vue";
 
 const props = defineProps<{
   nickname: string;
   authorized: boolean;
+  authProvider: AuthProvider | null;
   busy: boolean;
   gameRunning: boolean;
   needsDownload: boolean;
@@ -20,6 +21,12 @@ defineEmits<{ play: []; logout: []; settings: [] }>();
 
 const folderError = ref<string | null>(null);
 const displayError = computed(() => folderError.value ?? props.error);
+
+const authLabel = computed(() => {
+  if (props.authProvider === "microsoft") return "Аккаунт Microsoft";
+  if (props.authProvider === "telegram") return "Вход через Telegram";
+  return props.authorized ? "Авторизован" : "Не авторизован";
+});
 
 const playLabel = computed(() => {
   if (props.gameRunning) return "Игра запущена";
@@ -67,7 +74,7 @@ async function openFolder(): Promise<void> {
       <PlayerAvatar :nickname="nickname" />
       <div class="profile-copy">
         <strong>{{ nickname }}</strong>
-        <span>{{ authorized ? "Авторизован" : "Не авторизован" }}</span>
+        <span>{{ authLabel }}</span>
       </div>
       <button
         class="logout-button"
@@ -125,7 +132,7 @@ async function openFolder(): Promise<void> {
   min-width: 0;
   margin-left: 16px;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
 }
 
 .profile-copy strong {
@@ -139,9 +146,10 @@ async function openFolder(): Promise<void> {
 }
 
 .profile-copy span {
+  margin-top: -2px;
   color: #a3a3a3;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 400;
   line-height: 18px;
 }
 
@@ -230,7 +238,7 @@ async function openFolder(): Promise<void> {
   border: 2px solid #555;
   border-radius: 8px;
   background: #404040;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
 }
 
