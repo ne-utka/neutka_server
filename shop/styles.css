@@ -63,6 +63,28 @@ main { width: min(1040px, calc(100% - 48px)); margin: 0 auto; padding: 82px 0 52
 .buy-button svg { width: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform .18s ease; }
 .buy-button:hover svg { transform: translateX(2px); }
 .legal-note { margin: 18px 0 0; color: #666; font-size: 12px; text-align: center; }
+.legal-links { display: flex; justify-content: center; margin-top: 10px; }
+.legal-links a { color: #8c8c8c; font-size: 12px; font-weight: 600; text-underline-offset: 3px; transition: color .18s ease; }
+.legal-links a:hover { color: #fff; }
+
+.legal-main { width: min(900px, calc(100% - 48px)); padding-top: 58px; }
+.legal-document { overflow: hidden; border: 1px solid var(--border); border-radius: 22px; background: rgba(23,23,23,.96); box-shadow: 0 30px 90px rgba(0,0,0,.35); }
+.legal-heading { padding: 46px 54px 38px; border-bottom: 1px solid var(--border); background: linear-gradient(145deg, rgba(29,114,242,.13), transparent 62%); }
+.back-link { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 34px; color: #a3a3a3; font-size: 13px; font-weight: 600; text-decoration: none; transition: color .18s ease; }
+.back-link:hover { color: #fff; }
+.back-link svg { width: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.legal-heading h1 { margin: 14px 0 14px; font-size: clamp(38px, 7vw, 58px); line-height: 1; letter-spacing: -.05em; }
+.legal-heading > p { max-width: 680px; margin: 0; color: var(--muted); font-size: 16px; line-height: 1.65; }
+.legal-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 26px; gap: 20px; color: #737373; font-size: 12px; font-weight: 600; }
+.legal-meta a { color: #b9d4ff; text-underline-offset: 3px; }
+.legal-document > section { padding: 32px 54px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.legal-document > section:last-child { border-bottom: 0; }
+.legal-document h2 { margin: 0 0 18px; font-size: 21px; letter-spacing: -.025em; }
+.legal-document section p { margin: 0 0 13px; color: #c8c8c8; font-size: 14px; line-height: 1.72; }
+.legal-document section p:last-child { margin-bottom: 0; }
+.legal-document section p b { color: #fff; font-weight: 700; }
+.legal-document section a { color: #8bb8ff; overflow-wrap: anywhere; }
+.requisites { background: rgba(255,255,255,.018); }
 
 .modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; padding: 24px; place-items: center; background: rgba(0,0,0,.75); backdrop-filter: blur(7px); }
 .modal-backdrop[hidden], .toast[hidden] { display: none; }
@@ -109,6 +131,15 @@ form button:hover { background: var(--accent-hover); }
   .buy-button { width: 100%; }
   .modal { padding: 28px 22px 22px; }
   .toast { right: 14px; bottom: 14px; left: 14px; }
+  .legal-main { width: calc(100% - 28px); padding-top: 30px; }
+  .legal-document { border-radius: 17px; }
+  .legal-heading { padding: 30px 22px 26px; }
+  .back-link { margin-bottom: 26px; }
+  .legal-heading h1 { font-size: 38px; }
+  .legal-meta { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .legal-document > section { padding: 27px 22px; }
+  .legal-document h2 { font-size: 19px; }
+  .legal-document section p { font-size: 13px; line-height: 1.68; }
 }
 
 @media (prefers-reduced-motion: reduce) {
