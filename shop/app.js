@@ -1,5 +1,5 @@
 const modal = document.querySelector("#nickname-modal");
-const buyButton = document.querySelector("#buy-button");
+const buyButtons = document.querySelectorAll(".buy-button");
 const closeButton = document.querySelector("#modal-close");
 const form = document.querySelector("#nickname-form");
 const nicknameInput = document.querySelector("#nickname");
@@ -8,8 +8,10 @@ const toast = document.querySelector("#toast");
 
 const nicknamePattern = /^[A-Za-z0-9_]{3,16}$/;
 let toastTimer;
+let activeProduct = "Проходка";
 
-function openModal() {
+function openModal(event) {
+  activeProduct = event.currentTarget.dataset.product ?? "Проходка";
   modal.hidden = false;
   document.body.style.overflow = "hidden";
   nicknameInput.value = localStorage.getItem("springrp-shop-nickname") ?? "";
@@ -20,7 +22,7 @@ function openModal() {
 function closeModal() {
   modal.hidden = true;
   document.body.style.overflow = "";
-  buyButton.focus();
+  document.querySelector(`[data-product="${CSS.escape(activeProduct)}"]`)?.focus();
 }
 
 function resetValidation() {
@@ -38,7 +40,7 @@ function showToast(message) {
   }, 4000);
 }
 
-buyButton.addEventListener("click", openModal);
+buyButtons.forEach((button) => button.addEventListener("click", openModal));
 closeButton.addEventListener("click", closeModal);
 
 modal.addEventListener("click", (event) => {
@@ -65,5 +67,5 @@ form.addEventListener("submit", (event) => {
 
   localStorage.setItem("springrp-shop-nickname", nickname);
   closeModal();
-  showToast(`Ник ${nickname} сохранён. Касса появится позже.`);
+  showToast(`${activeProduct}: ник ${nickname} сохранён. Касса появится позже.`);
 });

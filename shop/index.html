@@ -29,6 +29,7 @@
         <p>Один месяц доступа к SpringRP — без автопродления и скрытых условий.</p>
       </section>
 
+      <div class="product-list">
       <section class="product" aria-labelledby="product-title">
         <div class="product-visual" aria-hidden="true">
           <div class="ticket">
@@ -61,13 +62,54 @@
               <span>Стоимость</span>
               <strong>Касса скоро</strong>
             </div>
-            <button class="buy-button" id="buy-button" type="button">
+            <button class="buy-button" type="button" data-product="Проходка на месяц">
               <span>Купить</span>
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5"/></svg>
             </button>
           </div>
         </div>
       </section>
+
+      <section class="product product--lifetime" aria-labelledby="lifetime-product-title">
+        <div class="product-visual" aria-hidden="true">
+          <div class="ticket">
+            <img class="ticket-logo" src="./logo.png" alt="" />
+            <span class="ticket-name">SPRINGRP</span>
+            <span class="ticket-term">НАВСЕГДА</span>
+            <span class="ticket-grid"></span>
+          </div>
+        </div>
+
+        <div class="product-copy">
+          <div class="product-heading">
+            <div>
+              <span class="product-tag">БЕССРОЧНАЯ</span>
+              <h2 id="lifetime-product-title">Бессрочная проходка</h2>
+            </div>
+            <span class="availability"><i></i> Доступно</span>
+          </div>
+
+          <p class="description">Постоянный доступ к игровому миру SpringRP без срока окончания и продлений.</p>
+
+          <ul class="features">
+            <li><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7"/></svg>Доступ без ограничения срока</li>
+            <li><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7"/></svg>Активация на указанный ник</li>
+            <li><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7"/></svg>Один платёж без продления</li>
+          </ul>
+
+          <div class="purchase-row">
+            <div class="price-block">
+              <span>Стоимость</span>
+              <strong>Касса скоро</strong>
+            </div>
+            <button class="buy-button" type="button" data-product="Бессрочная проходка">
+              <span>Купить</span>
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+      </div>
 
       <p class="legal-note">Оплата пока не подключена. На этом этапе мы только сохраним ник для будущего заказа.</p>
     </main>
