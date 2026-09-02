@@ -38,23 +38,13 @@ main { width: min(1040px, calc(100% - 48px)); margin: 0 auto; padding: 82px 0 52
 .hero p { max-width: 600px; margin: 0; color: var(--muted); font-size: 17px; line-height: 1.65; }
 
 .product-list { display: grid; gap: 28px; }
-.product { display: grid; overflow: hidden; min-height: 430px; border: 1px solid var(--border); border-radius: 22px; background: rgba(23,23,23,.94); box-shadow: 0 30px 90px rgba(0,0,0,.35); grid-template-columns: minmax(300px, .9fr) 1.1fr; }
-.product-visual { position: relative; display: grid; overflow: hidden; min-height: 430px; place-items: center; background: linear-gradient(145deg, #151d2b, #0d47a1); }
-.product-visual::before { position: absolute; width: 360px; height: 360px; border: 1px solid rgba(255,255,255,.12); border-radius: 50%; content: ""; box-shadow: 0 0 0 56px rgba(255,255,255,.035), 0 0 0 112px rgba(255,255,255,.025); }
-.product-visual::after { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px); background-size: 32px 32px; content: ""; mask-image: linear-gradient(to bottom, #000, transparent); }
-.ticket { position: relative; z-index: 1; display: flex; width: 260px; height: 330px; padding: 28px; overflow: hidden; border: 1px solid rgba(255,255,255,.18); border-radius: 20px; background: linear-gradient(160deg, rgba(255,255,255,.17), rgba(255,255,255,.05)); box-shadow: 0 24px 60px rgba(0,0,0,.35); flex-direction: column; transform: rotate(-4deg); backdrop-filter: blur(14px); }
-.ticket-logo { display: block; width: 52px; height: 52px; border-radius: 15px; object-fit: cover; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
-.ticket-name { margin-top: auto; font-size: 28px; font-weight: 800; letter-spacing: -.04em; }
-.ticket-term { margin-top: 8px; color: rgba(255,255,255,.72); font-size: 12px; font-weight: 700; letter-spacing: .17em; }
-.ticket-grid { position: absolute; top: -30px; right: -55px; width: 180px; height: 180px; border: 25px solid rgba(255,255,255,.06); border-radius: 50%; }
-.product--lifetime .product-visual { background: linear-gradient(145deg, #ffcab0, #d97757); }
-.product--lifetime .product-visual::before { border-color: rgba(255,255,255,.22); box-shadow: 0 0 0 56px rgba(255,255,255,.07), 0 0 0 112px rgba(255,255,255,.045); }
-.product--lifetime .ticket { border-color: rgba(255,255,255,.32); background: linear-gradient(160deg, rgba(255,255,255,.28), rgba(122,49,28,.12)); }
+.product { display: grid; overflow: hidden; border: 1px solid var(--border); border-radius: 22px; background: rgba(23,23,23,.94); box-shadow: 0 30px 90px rgba(0,0,0,.35); }
+.product--lifetime { border-color: rgba(237,125,87,.38); background: linear-gradient(135deg, rgba(237,125,87,.12), rgba(23,23,23,.96) 48%); }
 .product--lifetime .product-tag { color: #ff9f7a; }
 .product--lifetime .buy-button { background: #ed7d57; }
 .product--lifetime .buy-button:hover { background: #d96945; }
 
-.product-copy { display: flex; padding: 48px; flex-direction: column; }
+.product-copy { display: flex; min-height: 350px; padding: 44px 48px; flex-direction: column; }
 .product-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .product-heading h2 { margin: 10px 0 0; font-size: 30px; font-weight: 700; letter-spacing: -.035em; }
 .availability { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid #234c35; border-radius: 999px; color: #79d99d; background: #15261b; font-size: 11px; font-weight: 700; white-space: nowrap; }
@@ -104,11 +94,6 @@ form button:hover { background: var(--accent-hover); }
   main { padding-top: 54px; }
   .hero { margin-bottom: 36px; }
   .hero h1 { font-size: clamp(42px, 13vw, 62px); }
-  .product { grid-template-columns: 1fr; }
-  .product-visual { min-height: 310px; }
-  .ticket { width: 205px; height: 255px; padding: 23px; }
-  .ticket-logo { width: 44px; height: 44px; font-size: 23px; }
-  .ticket-name { font-size: 23px; }
   .product-copy { padding: 32px; }
 }
 
