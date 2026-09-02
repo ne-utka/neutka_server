@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b0b0b" />
+    <meta name="description" content="Проходка на сервер SpringRP на один месяц." />
+    <title>Магазин — SpringRP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="SpringRP — на главную">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2.6c5.2 0 9.4 4.2 9.4 9.4s-4.2 9.4-9.4 9.4S2.6 17.2 2.6 12 6.8 2.6 12 2.6Z"/><path class="brand-cube" d="m8 9.3 4-2.3 4 2.3v4.6l-4 2.3-4-2.3V9.3Zm4 2.3L8 9.3m4 2.3 4-2.3m-4 2.3v4.6"/></svg>
+        </span>
+        <span>SpringRP</span>
+      </a>
+      <span class="header-label">Магазин</span>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="page-title">
+        <span class="eyebrow">МАГАЗИН SPRINGRP</span>
+        <h1 id="page-title">Твой билет<br />в историю сервера</h1>
+        <p>Один месяц доступа к SpringRP — без автопродления и скрытых условий.</p>
+      </section>
+
+      <section class="product" aria-labelledby="product-title">
+        <div class="product-visual" aria-hidden="true">
+          <div class="ticket">
+            <span class="ticket-logo">S</span>
+            <span class="ticket-name">SPRINGRP</span>
+            <span class="ticket-term">30 ДНЕЙ</span>
+            <span class="ticket-grid"></span>
+          </div>
+        </div>
+
+        <div class="product-copy">
+          <div class="product-heading">
+            <div>
+              <span class="product-tag">ПРОХОДКА</span>
+              <h2 id="product-title">Проходка на месяц</h2>
+            </div>
+            <span class="availability"><i></i> Доступно</span>
+          </div>
+
+          <p class="description">Полный доступ к игровому миру SpringRP на 30 дней с момента активации.</p>
+
+          <ul class="features">
+            <li><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7"/></svg>30 дней доступа</li>
+            <li><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7"/></svg>Активация на указанный ник</li>
+            <li><svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7"/></svg>Без автоматического продления</li>
+          </ul>
+
+          <div class="purchase-row">
+            <div class="price-block">
+              <span>Стоимость</span>
+              <strong>Касса скоро</strong>
+            </div>
+            <button class="buy-button" id="buy-button" type="button">
+              <span>Купить</span>
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <p class="legal-note">Оплата пока не подключена. На этом этапе мы только сохраним ник для будущего заказа.</p>
+    </main>
+
+    <div class="modal-backdrop" id="nickname-modal" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <button class="modal-close" id="modal-close" type="button" aria-label="Закрыть">
+          <svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg>
+        </button>
+        <span class="modal-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm-8 18c.7-4.2 3.4-6.3 8-6.3s7.3 2.1 8 6.3"/></svg>
+        </span>
+        <h2 id="modal-title">Укажи никнейм</h2>
+        <p>На него будет активирована проходка после подключения оплаты.</p>
+        <form id="nickname-form" novalidate>
+          <label for="nickname">Никнейм в Minecraft</label>
+          <input id="nickname" name="nickname" type="text" minlength="3" maxlength="16" autocomplete="username" placeholder="Например, Steve" />
+          <span class="field-hint" id="nickname-hint">Латиница, цифры и нижнее подчёркивание</span>
+          <button type="submit">Продолжить</button>
+        </form>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden>
+      <svg viewBox="0 0 20 20"><path d="m5 10 3 3 7-7"/></svg>
+      <span></span>
+    </div>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>
